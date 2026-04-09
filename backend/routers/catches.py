@@ -4,21 +4,26 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 from db import get_client
-from services.xp_service import compute_xp, apply_xp
+from services.xp_service import compute_xp, apply_xp, session_catch_count
 from services.territory_service import record_road_scan
 from services.first_finder_service import check_first_finder
 
 # --- Dedup configuration ---
-# Tier 1 (hash-based): plate hash is only trusted when ALPR plate read confidence
-# is high enough. Below this, the hash is too unreliable to use for dedup.
 HASH_DEDUP_MIN_PLATE_CONFIDENCE = 0.85
 HASH_DEDUP_WINDOW_HOURS         = 4
 
-# Tier 2 (fuzzy): same generation + same district + short window.
-# Catches parking-lot farming even without a reliable plate read.
-# Intentionally short — a tight window avoids false positives on busy roads
-# where many cars of the same model pass through the same district.
+# Tier 2 fuzzy: highway only — same generation + district + tight window.
+# NOT applied to scan360 (dealer lots have many identical cars legitimately).
 FUZZY_DEDUP_WINDOW_MINUTES      = 20
+
+# scan360 guard: minimum gap between 360° scans of the same generation.
+# Walking around a car takes ~90s, so < 3 min = almost certainly same car.
+SCAN360_MIN_GAP_MINUTES         = 3
+
+# Diminishing XP: same generation caught multiple times in a 24h window.
+# Dealer visits are legitimate but shouldn't be an XP farm.
+# Catches beyond these thresholds still record + contribute to road king.
+SESSION_WINDOW_HOURS            = 24
 
 router = APIRouter()
 
@@ -60,12 +65,20 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     # Two-tier dedup check
     dedup_result = _check_dedup(
         db, player_id,
+        catch_type=body.catch_type,
         vehicle_hash=body.vehicle_hash,
         plate_confidence=body.alpr_plate_confidence,
         generation_id=body.generation_id,
         fuzzy_district=body.fuzzy_district,
     )
     is_duplicate = dedup_result is not None
+
+    # Count how many times this player has caught this generation in the last 24h.
+    # Used for diminishing XP — computed before inserting so the current catch
+    # isn't included in the count yet.
+    same_gen_count = session_catch_count(
+        db, player_id, body.generation_id, SESSION_WINDOW_HOURS
+    ) if body.generation_id else 0
 
     # Insert catch row
     catch_row = {
@@ -111,6 +124,7 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         generation_id=body.generation_id,
         rarity_tier=_get_rarity(db, body.generation_id),
         is_personal_first=_is_personal_first(db, player_id, body.generation_id),
+        session_same_gen_count=same_gen_count,
     )
     new_total_xp, level_up = apply_xp(db, player_id, xp_earned, catch_id, xp_reasons)
 
@@ -141,28 +155,32 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
 def _check_dedup(
     db,
     player_id: str,
+    catch_type: str,
     vehicle_hash: Optional[str],
     plate_confidence: Optional[float],
     generation_id: Optional[str],
     fuzzy_district: Optional[str],
 ) -> Optional[str]:
     """
-    Two-tier dedup. Returns the tier that fired ("hash" | "fuzzy"), or None.
+    Returns the dedup tier that fired ("hash" | "fuzzy" | "scan360_gap"), or None.
 
-    Tier 1 — Hash (exact plate identity):
-      Requires plate_confidence >= 0.85 to be trustworthy. A lower-confidence
-      read may have misread characters, producing a hash that doesn't match the
-      same plate on the next pass. Window: 4 hours.
+    Tier 1 — Hash (all catch types, 4hr window):
+      Only used when plate_confidence >= 0.85. A low-confidence read may have
+      misread characters, making the hash unreliable across multiple passes.
 
-    Tier 2 — Fuzzy (generation + district + time):
-      Catches the parking-lot farming case even without a readable plate.
-      Same player + same generation + same district within 20 minutes = same car.
-      Window intentionally short to avoid false positives on busy roads where
-      many cars of the same model legitimately pass through the same district.
+    Tier 2 — Fuzzy (highway only, 20min window):
+      Same generation + same district in a short window = same parked car.
+      NOT applied to scan360 — a dealer lot full of identical cars is a
+      legitimate use case. Players walking the lot should catch them all.
+
+    Tier 3 — scan360 gap (scan360 only, 3min window):
+      Physically walking around a car takes ~90s. Two 360° scans of the same
+      generation in the same district under 3 minutes apart = same car.
+      Tighter than fuzzy — just enough to catch lazy re-scans.
     """
     now = datetime.now(timezone.utc)
 
-    # Tier 1: hash-based — only when plate read confidence is high enough
+    # Tier 1: hash-based — applies to all catch types
     if vehicle_hash and (plate_confidence or 0) >= HASH_DEDUP_MIN_PLATE_CONFIDENCE:
         cutoff = (now - timedelta(hours=HASH_DEDUP_WINDOW_HOURS)).isoformat()
         result = db.table("catches").select("id", count="exact") \
@@ -173,17 +191,33 @@ def _check_dedup(
         if (result.count or 0) > 0:
             return "hash"
 
-    # Tier 2: fuzzy — generation + district + tight time window
-    if generation_id and fuzzy_district:
-        cutoff = (now - timedelta(minutes=FUZZY_DEDUP_WINDOW_MINUTES)).isoformat()
-        result = db.table("catches").select("id", count="exact") \
-            .eq("player_id", player_id) \
-            .eq("generation_id", generation_id) \
-            .eq("fuzzy_district", fuzzy_district) \
-            .gte("caught_at", cutoff) \
-            .execute()
-        if (result.count or 0) > 0:
-            return "fuzzy"
+    if catch_type == "highway":
+        # Tier 2: fuzzy — highway drive-bys only
+        if generation_id and fuzzy_district:
+            cutoff = (now - timedelta(minutes=FUZZY_DEDUP_WINDOW_MINUTES)).isoformat()
+            result = db.table("catches").select("id", count="exact") \
+                .eq("player_id", player_id) \
+                .eq("generation_id", generation_id) \
+                .eq("fuzzy_district", fuzzy_district) \
+                .eq("catch_type", "highway") \
+                .gte("caught_at", cutoff) \
+                .execute()
+            if (result.count or 0) > 0:
+                return "fuzzy"
+
+    elif catch_type == "scan360":
+        # Tier 3: 360° scan gap — physically can't walk around the same car in < 3 min
+        if generation_id and fuzzy_district:
+            cutoff = (now - timedelta(minutes=SCAN360_MIN_GAP_MINUTES)).isoformat()
+            result = db.table("catches").select("id", count="exact") \
+                .eq("player_id", player_id) \
+                .eq("generation_id", generation_id) \
+                .eq("fuzzy_district", fuzzy_district) \
+                .eq("catch_type", "scan360") \
+                .gte("caught_at", cutoff) \
+                .execute()
+            if (result.count or 0) > 0:
+                return "scan360_gap"
 
     return None
 

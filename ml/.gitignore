@@ -1,0 +1,6 @@
+data/images/
+models/
+export/*.mlpackage
+export/*.tflite
+__pycache__/
+*.pyc

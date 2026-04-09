@@ -4,41 +4,42 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      platform:
-        description: 'Platform to build'
-        required: false
-        default: 'all'
-        type: choice
-        options: [all, android, ios]
 
 jobs:
-  build:
-    name: EAS Preview — ${{ github.event.inputs.platform || 'all' }}
+  android:
+    name: Android — Preview APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
+      - run: npm ci
         working-directory: mobile
-        run: npm ci
-
-      - name: Queue EAS builds
+      - run: eas build --platform android --profile preview --non-interactive --no-wait
         working-directory: mobile
-        run: |
-          eas build \
-            --platform ${{ github.event.inputs.platform || 'all' }} \
-            --profile preview \
-            --non-interactive \
-            --no-wait
+
+  ios:
+    name: iOS — Preview IPA
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+        working-directory: mobile
+      - run: eas build --platform ios --profile preview --non-interactive --no-wait
+        working-directory: mobile

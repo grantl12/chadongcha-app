@@ -30,6 +30,19 @@ export type ALPRResult = {
    * Max +0.15 per brief §4.1. 0 if plate unreadable or VIN lookup failed.
    */
   confidenceBoost: number;
+  /**
+   * One-way SHA-256 hash of the plate string, computed inside the native
+   * module before the plate string is zeroed. Used ONLY for same-vehicle
+   * deduplication on the backend — prevents farming XP from the same
+   * physical car repeatedly.
+   *
+   * The backend checks: has this player caught a vehicle with this hash
+   * within the dedup window? If yes, catch is recorded but no XP awarded.
+   *
+   * Plate string is NEVER recoverable from this hash. null if plate
+   * was unreadable (dedup check skipped for that catch).
+   */
+  vehicleHash: string | null;
 };
 
 export interface IALPRWrapper {
@@ -55,8 +68,7 @@ export const ALPRWrapper: IALPRWrapper = ALPRWrapperModule;
 
 export const ALPRWrapperStub: IALPRWrapper = {
   process(_frame, _bbox): ALPRResult {
-    // Stub: no plate reading, no confidence boost
-    // This is the safe fallback — production module provides the boost
-    return { confidenceBoost: 0 };
+    // Stub: no plate reading, no confidence boost, no dedup hash
+    return { confidenceBoost: 0, vehicleHash: null };
   },
 };

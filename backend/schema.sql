@@ -93,14 +93,21 @@ create table catches (
   road_segment_id uuid,                             -- fk added after road_segments table
   caught_at      timestamptz not null default now(),
   xp_awarded     int not null default 0,
+  -- dedup: one-way SHA-256 hash of plate, computed on-device inside alpr-wrapper.
+  -- plate string is never stored or transmitted — only this hash.
+  -- null when plate was unreadable (dedup skipped).
+  vehicle_hash   text,
   -- space catches
   space_object_id uuid,                             -- fk added after catchable_objects table
   synced_at      timestamptz                        -- when backend received it
 );
 
-create index catches_player_id_idx    on catches(player_id);
-create index catches_generation_id_idx on catches(generation_id);
-create index catches_caught_at_idx    on catches(caught_at desc);
+create index catches_player_id_idx        on catches(player_id);
+create index catches_generation_id_idx    on catches(generation_id);
+create index catches_caught_at_idx        on catches(caught_at desc);
+-- dedup lookup: find recent catches by this player with the same vehicle hash
+create index catches_dedup_idx            on catches(player_id, vehicle_hash, caught_at desc)
+  where vehicle_hash is not null;
 
 -- ============================================================
 -- FIRST FINDERS

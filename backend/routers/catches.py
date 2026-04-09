@@ -1,12 +1,16 @@
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from db import get_client
 from services.xp_service import compute_xp, apply_xp
 from services.territory_service import record_road_scan
 from services.first_finder_service import check_first_finder
+
+# How long the same physical vehicle (by plate hash) is protected from re-catch XP.
+# Player can still catch it (record is stored) but no XP is awarded.
+DEDUP_WINDOW_HOURS = 4
 
 router = APIRouter()
 
@@ -23,8 +27,11 @@ class CatchPayload(BaseModel):
     road_segment_id: Optional[str] = None
     space_object_id: Optional[str] = None
     caught_at: datetime
-    # ALPR output — confidence boost only, plate NEVER in payload
+    # ALPR output — confidence boost + dedup hash. Plate NEVER in payload.
     alpr_confidence_boost: Optional[float] = None
+    # SHA-256 hash of plate, computed on-device inside alpr-wrapper before plate is zeroed.
+    # null when plate was unreadable — dedup check is skipped for that catch.
+    vehicle_hash: Optional[str] = None
 
 
 @router.post("")
@@ -38,6 +45,9 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         player_id = user.user.id
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Dedup check — same physical vehicle (by plate hash) within the window
+    is_duplicate = _is_duplicate_vehicle(db, player_id, body.vehicle_hash)
 
     # Insert catch row
     catch_row = {
@@ -54,9 +64,23 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         "space_object_id": body.space_object_id,
         "caught_at": body.caught_at.isoformat(),
         "synced_at": datetime.utcnow().isoformat(),
+        "vehicle_hash": body.vehicle_hash,
     }
     result = db.table("catches").insert(catch_row).execute()
     catch_id = result.data[0]["id"]
+
+    # Short-circuit XP + territory + first-finder for duplicates.
+    # Catch is still recorded — it's a real sighting — just no reward.
+    if is_duplicate:
+        return {
+            "catch_id": catch_id,
+            "xp_earned": 0,
+            "new_total_xp": _get_player_xp(db, player_id),
+            "level_up": False,
+            "road_king_claimed": False,
+            "first_finder_awarded": None,
+            "duplicate": True,
+        }
 
     # XP computation
     xp_earned, xp_reasons = compute_xp(
@@ -87,7 +111,30 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         "level_up": level_up,
         "road_king_claimed": road_king_claimed,
         "first_finder_awarded": first_finder_awarded,
+        "duplicate": False,
     }
+
+
+def _is_duplicate_vehicle(db, player_id: str, vehicle_hash: Optional[str]) -> bool:
+    """
+    Returns True if this player already caught a vehicle with the same plate hash
+    within DEDUP_WINDOW_HOURS. Skipped entirely when vehicle_hash is None (plate
+    was unreadable — we give the player the benefit of the doubt).
+    """
+    if not vehicle_hash:
+        return False
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=DEDUP_WINDOW_HOURS)).isoformat()
+    result = db.table("catches").select("id", count="exact") \
+        .eq("player_id", player_id) \
+        .eq("vehicle_hash", vehicle_hash) \
+        .gte("caught_at", cutoff) \
+        .execute()
+    return (result.count or 0) > 0
+
+
+def _get_player_xp(db, player_id: str) -> int:
+    result = db.table("players").select("xp").eq("id", player_id).single().execute()
+    return result.data["xp"] if result.data else 0
 
 
 def _get_rarity(db, generation_id: Optional[str]) -> Optional[str]:

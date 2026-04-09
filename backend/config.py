@@ -1,12 +1,17 @@
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",          # don't error on unknown env vars
+    )
+
     supabase_url: str
     supabase_service_key: str
-    # Accepts a comma-separated string from Railway env vars
-    # e.g. ALLOWED_ORIGINS="http://localhost:8081,https://your-app.com"
     allowed_origins: list[str] = ["http://localhost:8081"]
     redis_url: str = "redis://localhost:6379"
     r2_account_id: str = ""
@@ -25,9 +30,5 @@ class Settings(BaseSettings):
             return [o.strip() for o in v.split(",") if o.strip()]
         return list(v)  # type: ignore[arg-type]
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
-
-settings = Settings()  # type: ignore[call-arg]
+settings = Settings()

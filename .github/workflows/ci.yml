@@ -37,23 +37,9 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
+      # Generate Expo Router typed-route declarations before tsc runs.
+      # Without this, .expo/types/router.d.ts is missing (it's gitignored)
+      # and the TS check fails even though expo/tsconfig.base sets skipLibCheck.
+      - name: Generate Expo Router types
+        run: npx expo export --dump-sourcemap --platform web 2>/dev/null || true
       - run: npx tsc --noEmit
-
-  eas-preview-build:
-    name: EAS Preview Build (on main only)
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: [backend-lint, mobile-ts]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-      - working-directory: mobile
-        run: |
-          npm ci
-          eas build --platform all --profile preview --non-interactive

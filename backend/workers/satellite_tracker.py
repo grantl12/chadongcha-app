@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 import httpx
-from sgp4.api import Satrec, jday
+from sgp4.api import Satrec
 
 from db import get_client
 
@@ -38,7 +38,7 @@ async def fetch_tles(group: str) -> list[tuple[str, str, str]]:
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(url)
         resp.raise_for_status()
-    lines = [l.strip() for l in resp.text.splitlines() if l.strip()]
+    lines = [line.strip() for line in resp.text.splitlines() if line.strip()]
     tles = []
     for i in range(0, len(lines) - 2, 3):
         tles.append((lines[i], lines[i+1], lines[i+2]))
@@ -106,14 +106,12 @@ async def compute_passes():
 
     # Get distinct active player cities as proxy locations
     players = db.table("players").select("home_city").not_.is_("home_city", "null").execute()
-    cities: set[str] = {p["home_city"] for p in players.data if p.get("home_city")}
-
     now = datetime.now(timezone.utc)
     window_end = now + timedelta(hours=PASS_WINDOW_HOURS)
 
     for sat in sats.data:
         try:
-            satrec = Satrec.twoline2rv(sat["tle_line1"], sat["tle_line2"])
+            Satrec.twoline2rv(sat["tle_line1"], sat["tle_line2"])
             # Insert a generic global catchable window as a placeholder.
             # Production: compute per-city ground tracks with SGP4 properly.
             db.table("catchable_objects").insert({

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 
 def record_road_scan(db, player_id: str, road_segment_id: str) -> bool:

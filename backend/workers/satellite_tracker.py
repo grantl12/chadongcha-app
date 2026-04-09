@@ -104,8 +104,6 @@ async def compute_passes():
     if not sats.data:
         return
 
-    # Get distinct active player cities as proxy locations
-    players = db.table("players").select("home_city").not_.is_("home_city", "null").execute()
     now = datetime.now(timezone.utc)
     window_end = now + timedelta(hours=PASS_WINDOW_HOURS)
 

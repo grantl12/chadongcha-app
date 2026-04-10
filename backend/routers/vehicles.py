@@ -26,7 +26,7 @@ async def get_generation(generation_id: str):
     db = get_client()
     result = db.table("generations").select("*, models(*, makes(*)), variants(*)") \
         .eq("id", generation_id).maybe_single().execute()
-    return result.data
+    return result.data if result else None
 
 
 @router.get("/search")

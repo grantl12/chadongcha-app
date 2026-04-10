@@ -44,6 +44,9 @@ async def signin(body: SignInRequest):
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
+    if not result.session or not result.user:
+        raise HTTPException(status_code=401, detail="Sign in failed")
+
     return {
         "access_token": result.session.access_token,
         "refresh_token": result.session.refresh_token,
@@ -56,8 +59,10 @@ async def me_info(authorization: str = Header(...)):
     db = get_client()
     token = authorization.replace("Bearer ", "")
     try:
-        user = db.auth.get_user(token)
-        user_id = user.user.id
+        auth_result = db.auth.get_user(token)
+        if not auth_result.user:
+            raise ValueError("no user in response")
+        user_id = auth_result.user.id
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 

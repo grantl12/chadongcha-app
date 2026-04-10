@@ -57,8 +57,10 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     # Resolve player from JWT
     token = authorization.replace("Bearer ", "")
     try:
-        user = db.auth.get_user(token)
-        player_id = user.user.id
+        auth_result = db.auth.get_user(token)
+        if not auth_result.user:
+            raise ValueError("no user in response")
+        player_id = auth_result.user.id
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 

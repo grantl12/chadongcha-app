@@ -31,4 +31,4 @@ async def road_leaderboard(road_segment_id: str):
         .select("*, players(username)") \
         .eq("road_segment_id", road_segment_id) \
         .order("scan_count_30d", desc=True).limit(5).execute()
-    return {"segment": segment.data, "challengers": challengers.data}
+    return {"segment": segment.data if segment else None, "challengers": challengers.data}

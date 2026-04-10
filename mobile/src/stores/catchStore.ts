@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,6 +11,7 @@ export type CatchRecord = {
   model: string;
   generation: string;
   generationId: string | null;   // resolved from vehicle DB; null until synced
+  rarity: string | null;         // resolved from vehicle DB; null until synced
   bodyStyle: string;
   color: string;
   confidence: number;
@@ -26,6 +28,7 @@ type CatchResponse  = {
   catch_id: string;
   xp_earned: number;
   new_total_xp: number;
+  new_level: number;
   level_up: boolean;
   road_king_claimed: boolean;
   first_finder_awarded: string | null;
@@ -36,19 +39,18 @@ async function resolveGenerationId(
   make: string,
   model: string,
   generation: string,
-): Promise<string | null> {
+): Promise<ResolveResult> {
   try {
     const params = new URLSearchParams({ make, model, generation });
-    const res = await apiClient.get(`/vehicles/resolve?${params}`) as ResolveResult;
-    return res.generation_id ?? null;
+    return await apiClient.get(`/vehicles/resolve?${params}`) as ResolveResult;
   } catch {
-    return null;
+    return { generation_id: null, rarity_tier: null };
   }
 }
 
 type CatchStore = {
   catches: CatchRecord[];
-  addCatch: (data: Omit<CatchRecord, 'id' | 'caughtAt' | 'synced' | 'generationId'>) => void;
+  addCatch: (data: Omit<CatchRecord, 'id' | 'caughtAt' | 'synced' | 'generationId' | 'rarity'>) => void;
   syncPending: () => Promise<void>;
 };
 
@@ -61,6 +63,7 @@ export const useCatchStore = create<CatchStore>()(
         const record: CatchRecord = {
           ...data,
           generationId: null,
+          rarity:       null,
           id:       `${Date.now()}-${Math.random().toString(36).slice(2)}`,
           caughtAt: new Date().toISOString(),
           synced:   false,
@@ -73,16 +76,19 @@ export const useCatchStore = create<CatchStore>()(
         const pending = get().catches.filter(c => !c.synced);
         for (const catch_ of pending) {
           try {
-            // Resolve generation ID if not yet known
+            // Resolve generation ID + rarity if not yet known
             let generationId = catch_.generationId;
+            let rarity       = catch_.rarity;
             if (!generationId) {
-              generationId = await resolveGenerationId(
+              const resolved = await resolveGenerationId(
                 catch_.make, catch_.model, catch_.generation,
               );
+              generationId = resolved?.generation_id ?? null;
+              rarity       = resolved?.rarity_tier   ?? null;
               if (generationId) {
                 set(s => ({
                   catches: s.catches.map(c =>
-                    c.id === catch_.id ? { ...c, generationId } : c,
+                    c.id === catch_.id ? { ...c, generationId, rarity } : c,
                   ),
                 }));
               }
@@ -98,10 +104,12 @@ export const useCatchStore = create<CatchStore>()(
               caught_at:     catch_.caughtAt,
             }) as CatchResponse;
 
-            // Apply XP to player state
+            // Apply XP — use server-authoritative level
             if (res.xp_earned > 0) {
-              const levelArg = res.level_up ? Math.floor(res.new_total_xp / 1000) + 1 : undefined;
-              usePlayerStore.getState().applyXp(res.xp_earned, levelArg);
+              usePlayerStore.getState().applyXp(
+                res.xp_earned,
+                res.level_up ? res.new_level : undefined,
+              );
             }
 
             set(s => ({
@@ -123,3 +131,11 @@ export const useCatchStore = create<CatchStore>()(
     },
   ),
 );
+
+// Retry unsynced catches whenever the app returns to the foreground.
+// Covers the case where the network was unavailable at catch time.
+AppState.addEventListener('change', state => {
+  if (state === 'active') {
+    useCatchStore.getState().syncPending().catch(() => {});
+  }
+});

@@ -33,16 +33,13 @@ const CATCH_TYPE_LABEL: Record<string, string> = {
   unknown: '???',
 };
 
-// Derive a rarity from confidence until generationId is resolved
-function inferRarity(catch_: CatchRecord): string {
-  if (catch_.confidence >= 0.9)  return 'epic';
-  if (catch_.confidence >= 0.8)  return 'rare';
-  if (catch_.confidence >= 0.72) return 'uncommon';
-  return 'common';
-}
-
 function CatchCard({ item }: { item: CatchRecord }) {
-  const rarity = inferRarity(item);
+  // Use DB rarity if resolved, otherwise infer from confidence while pending
+  const rarity = item.rarity ?? (
+    item.confidence >= 0.9  ? 'epic'     :
+    item.confidence >= 0.8  ? 'rare'     :
+    item.confidence >= 0.72 ? 'uncommon' : 'common'
+  );
   const bg     = RARITY_COLOR[rarity]   ?? RARITY_COLOR.common;
   const accent = RARITY_ACCENT[rarity]  ?? RARITY_ACCENT.common;
   const label  = RARITY_LABEL[rarity]   ?? 'COMMON';

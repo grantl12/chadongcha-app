@@ -145,7 +145,7 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         is_personal_first=_is_personal_first(db, player_id, body.generation_id),
         session_same_gen_count=same_gen_count,
     )
-    new_total_xp, level_up = apply_xp(db, player_id, xp_earned, catch_id, xp_reasons)
+    new_total_xp, level_up, new_level = apply_xp(db, player_id, xp_earned, catch_id, xp_reasons)
 
     # Territory
     road_king_claimed = False
@@ -164,6 +164,7 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         "catch_id": catch_id,
         "xp_earned": xp_earned,
         "new_total_xp": new_total_xp,
+        "new_level": new_level,
         "level_up": level_up,
         "road_king_claimed": road_king_claimed,
         "first_finder_awarded": first_finder_awarded,

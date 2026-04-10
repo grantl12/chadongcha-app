@@ -86,11 +86,11 @@ def compute_xp(
     return xp, reasons
 
 
-def apply_xp(db, player_id: str, xp_delta: int, catch_id: str, reasons: list[str]) -> tuple[int, bool]:
+def apply_xp(db, player_id: str, xp_delta: int, catch_id: str, reasons: list[str]) -> tuple[int, bool, int]:
     """Write XP event, update player total, return (new_total, levelled_up)."""
     if xp_delta <= 0:
         result = db.table("players").select("xp, level").eq("id", player_id).single().execute()
-        return result.data["xp"], False
+        return result.data["xp"], False, result.data["level"]
 
     # Log event
     db.table("xp_events").insert({
@@ -108,7 +108,7 @@ def apply_xp(db, player_id: str, xp_delta: int, catch_id: str, reasons: list[str
 
     db.table("players").update({"xp": new_xp, "level": new_level}).eq("id", player_id).execute()
 
-    return new_xp, levelled_up
+    return new_xp, levelled_up, new_level
 
 
 def session_catch_count(db, player_id: str, generation_id: Optional[str], window_hours: int) -> int:

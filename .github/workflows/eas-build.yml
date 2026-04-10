@@ -1,14 +1,20 @@
 name: EAS Preview Build
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: false
+        default: 'all'
+        type: choice
+        options: [all, android, ios]
 
 jobs:
   android:
     name: Android — Preview APK
     runs-on: ubuntu-latest
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,6 +37,7 @@ jobs:
   ios:
     name: iOS — Preview IPA
     runs-on: ubuntu-latest
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -33,11 +33,16 @@ router = APIRouter()
 
 
 @router.get("/recent")
-async def recent_catches(limit: int = 50, player_id: Optional[str] = None):
+async def recent_catches(
+    limit: int = 50,
+    player_id: Optional[str] = None,
+    generation_id: Optional[str] = None,
+):
     """
     Global activity feed — most recent catches from all players.
     Includes both vehicle catches (generation_id set) and space catches.
     Pass player_id to filter to a single player's catches.
+    Pass generation_id to filter to a single vehicle generation.
     """
     db = get_client()
     query = db.table("catches") \
@@ -52,6 +57,8 @@ async def recent_catches(limit: int = 50, player_id: Optional[str] = None):
 
     if player_id:
         query = query.eq("player_id", player_id)
+    if generation_id:
+        query = query.eq("generation_id", generation_id)
 
     result = query.execute()
     return result.data

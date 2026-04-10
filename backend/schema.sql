@@ -1,6 +1,7 @@
 -- CHADONGCHA · Supabase Schema
--- Run: supabase db push < backend/schema.sql
--- Or paste into Supabase SQL editor.
+-- Fully idempotent — safe to run against a database that already has some or
+-- all of these objects. Re-running will not drop or modify existing data.
+-- Run: paste into Supabase SQL editor and execute.
 
 -- ============================================================
 -- EXTENSIONS
@@ -12,7 +13,7 @@ create extension if not exists "pgcrypto";
 -- VEHICLE DATABASE
 -- ============================================================
 
-create table makes (
+create table if not exists makes (
   id          uuid primary key default uuid_generate_v4(),
   name        text not null unique,
   country     text,
@@ -20,7 +21,7 @@ create table makes (
   created_at  timestamptz not null default now()
 );
 
-create table models (
+create table if not exists models (
   id       uuid primary key default uuid_generate_v4(),
   make_id  uuid not null references makes(id) on delete cascade,
   name     text not null,
@@ -29,7 +30,7 @@ create table models (
   unique (make_id, name)
 );
 
-create table generations (
+create table if not exists generations (
   id                        uuid primary key default uuid_generate_v4(),
   model_id                  uuid not null references models(id) on delete cascade,
   generation_number         int  not null,
@@ -47,7 +48,7 @@ create table generations (
   unique (model_id, generation_number)
 );
 
-create table variants (
+create table if not exists variants (
   id               uuid primary key default uuid_generate_v4(),
   generation_id    uuid not null references generations(id) on delete cascade,
   name             text not null,           -- e.g. 'Sedan', 'Si', 'Type R'
@@ -60,24 +61,28 @@ create table variants (
 -- PLAYERS
 -- ============================================================
 
-create table players (
+create table if not exists players (
   id              uuid primary key references auth.users(id) on delete cascade,
   username        text unique,
   home_city       text,
-  home_city_set_at timestamptz,             -- enforce once-per-month change
+  home_city_set_at timestamptz,
   xp              bigint not null default 0,
   level           int    not null default 1,
   hero_car_id     uuid references generations(id),
-  plate_hash      text,                     -- bcrypt hash, cost 12 — opt-in only
+  plate_hash      text,
+  is_ai_rival     boolean not null default false,  -- ghost Road King placeholder
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
+
+-- push token for satellite pass notifications (added via migration 001 on existing DBs)
+alter table players add column if not exists expo_push_token text;
 
 -- ============================================================
 -- CATCHES
 -- ============================================================
 
-create table catches (
+create table if not exists catches (
   id             uuid primary key default uuid_generate_v4(),
   player_id      uuid not null references players(id) on delete cascade,
   generation_id  uuid references generations(id),   -- null = unknown vehicle
@@ -86,42 +91,35 @@ create table catches (
   color          text,
   body_style     text,
   confidence     float,
-  -- fuzzy location only — no street-level coordinates stored
   fuzzy_city     text,
   fuzzy_district text,
-  -- road segment catch occurred on (for road king XP)
-  road_segment_id uuid,                             -- fk added after road_segments table
+  road_segment_id uuid,
   caught_at      timestamptz not null default now(),
   xp_awarded     int not null default 0,
-  -- dedup: one-way SHA-256 hash of plate, computed on-device inside alpr-wrapper.
-  -- plate string is never stored or transmitted — only this hash.
-  -- null when plate was unreadable (dedup skipped).
   vehicle_hash   text,
-  -- space catches
-  space_object_id uuid,                             -- fk added after catchable_objects table
-  synced_at      timestamptz                        -- when backend received it
+  space_object_id uuid,
+  synced_at      timestamptz
 );
 
-create index catches_player_id_idx        on catches(player_id);
-create index catches_generation_id_idx    on catches(generation_id);
-create index catches_caught_at_idx        on catches(caught_at desc);
--- dedup lookup: find recent catches by this player with the same vehicle hash
-create index catches_dedup_idx            on catches(player_id, vehicle_hash, caught_at desc)
+create index if not exists catches_player_id_idx     on catches(player_id);
+create index if not exists catches_generation_id_idx on catches(generation_id);
+create index if not exists catches_caught_at_idx     on catches(caught_at desc);
+create index if not exists catches_dedup_idx         on catches(player_id, vehicle_hash, caught_at desc)
   where vehicle_hash is not null;
 
 -- ============================================================
 -- FIRST FINDERS
 -- ============================================================
 
-create table first_finders (
+create table if not exists first_finders (
   id             uuid primary key default uuid_generate_v4(),
   generation_id  uuid not null references generations(id) on delete cascade,
   variant_id     uuid references variants(id),
   player_id      uuid not null references players(id) on delete cascade,
   catch_id       uuid references catches(id),
   region_scope   text not null check (region_scope in ('city','country','continent','global')),
-  region_value   text not null,             -- e.g. 'Seoul', 'KR', 'Asia', 'global'
-  badge_name     text not null,             -- 'City Pioneer', 'National Spotter', etc.
+  region_value   text not null,
+  badge_name     text not null,
   awarded_at     timestamptz not null default now(),
   retroactive    boolean not null default false,
   unique (generation_id, player_id, region_scope, region_value)
@@ -131,12 +129,11 @@ create table first_finders (
 -- UNKNOWN VEHICLE COMMUNITY ID FLOW
 -- ============================================================
 
-create table unknown_catches (
+create table if not exists unknown_catches (
   id             uuid primary key default uuid_generate_v4(),
   catch_id       uuid not null unique references catches(id) on delete cascade,
   body_type      text,
   city           text,
-  -- opt-in photo — stored in R2, key here
   community_photo_ref text,
   photo_shared   boolean not null default false,
   status         text not null default 'open'
@@ -147,7 +144,7 @@ create table unknown_catches (
   created_at     timestamptz not null default now()
 );
 
-create table id_suggestions (
+create table if not exists id_suggestions (
   id               uuid primary key default uuid_generate_v4(),
   unknown_catch_id uuid not null references unknown_catches(id) on delete cascade,
   player_id        uuid not null references players(id) on delete cascade,
@@ -160,15 +157,15 @@ create table id_suggestions (
 -- ROAD OWNERSHIP (TERRITORY)
 -- ============================================================
 
-create table road_segments (
+create table if not exists road_segments (
   id              uuid primary key default uuid_generate_v4(),
-  osm_way_id      bigint unique,              -- OpenStreetMap way ID (way_id*1000+seg_idx)
+  osm_way_id      bigint unique,
   name            text,
   city            text,
   country         text,
-  centroid_lat    float,                      -- segment midpoint — used for proximity queries
+  centroid_lat    float,
   centroid_lon    float,
-  geometry_json   text,                       -- GeoJSON LineString for map rendering
+  geometry_json   text,
   king_id         uuid references players(id),
   king_car_id     uuid references generations(id),
   king_scan_count int not null default 0,
@@ -176,14 +173,18 @@ create table road_segments (
   created_at      timestamptz not null default now()
 );
 
-create index road_segments_city_idx on road_segments(city);
+create index if not exists road_segments_city_idx     on road_segments(city);
+create index if not exists road_segments_centroid_idx on road_segments(centroid_lat, centroid_lon);
 
--- back-fill FK now that road_segments exists
-alter table catches
-  add constraint catches_road_segment_id_fkey
-  foreign key (road_segment_id) references road_segments(id);
+-- Add FK from catches → road_segments (safe to run if it already exists)
+do $$ begin
+  alter table catches
+    add constraint catches_road_segment_id_fkey
+    foreign key (road_segment_id) references road_segments(id);
+exception when duplicate_object then null;
+end $$;
 
-create table road_challengers (
+create table if not exists road_challengers (
   id               uuid primary key default uuid_generate_v4(),
   road_segment_id  uuid not null references road_segments(id) on delete cascade,
   player_id        uuid not null references players(id) on delete cascade,
@@ -196,7 +197,7 @@ create table road_challengers (
 -- SPACE / SATELLITE OBJECTS
 -- ============================================================
 
-create table space_objects (
+create table if not exists space_objects (
   id              uuid primary key default uuid_generate_v4(),
   norad_id        int unique,
   name            text not null,
@@ -209,13 +210,12 @@ create table space_objects (
   created_at      timestamptz not null default now()
 );
 
-create table catchable_objects (
+create table if not exists catchable_objects (
   id              uuid primary key default uuid_generate_v4(),
   space_object_id uuid not null references space_objects(id) on delete cascade,
   pass_start      timestamptz not null,
   pass_end        timestamptz not null,
   max_elevation   float,
-  -- approximate region this pass is visible from
   region_lat      float,
   region_lon      float,
   region_radius_km float,
@@ -223,27 +223,30 @@ create table catchable_objects (
   created_at      timestamptz not null default now()
 );
 
-create index catchable_objects_pass_start_idx on catchable_objects(pass_start);
+create index if not exists catchable_objects_pass_start_idx on catchable_objects(pass_start);
 
--- back-fill FK now that catchable_objects exists
-alter table catches
-  add constraint catches_space_object_id_fkey
-  foreign key (space_object_id) references catchable_objects(id);
+-- Add FK from catches → catchable_objects
+do $$ begin
+  alter table catches
+    add constraint catches_space_object_id_fkey
+    foreign key (space_object_id) references catchable_objects(id);
+exception when duplicate_object then null;
+end $$;
 
 -- ============================================================
 -- XP LEDGER
 -- ============================================================
 
-create table xp_events (
+create table if not exists xp_events (
   id          uuid primary key default uuid_generate_v4(),
   player_id   uuid not null references players(id) on delete cascade,
   catch_id    uuid references catches(id),
-  reason      text not null,               -- 'highway_catch', 'road_king_passive', etc.
+  reason      text not null,
   xp_delta    int  not null,
   created_at  timestamptz not null default now()
 );
 
-create index xp_events_player_id_idx on xp_events(player_id);
+create index if not exists xp_events_player_id_idx on xp_events(player_id);
 
 -- ============================================================
 -- ROW LEVEL SECURITY
@@ -255,26 +258,43 @@ alter table first_finders   enable row level security;
 alter table unknown_catches enable row level security;
 alter table id_suggestions  enable row level security;
 alter table xp_events       enable row level security;
+alter table makes           enable row level security;
+alter table models          enable row level security;
+alter table generations     enable row level security;
+alter table variants        enable row level security;
 
--- Players can read their own row; service role bypasses RLS
-create policy "players_self_read"  on players for select using (auth.uid() = id);
-create policy "players_self_write" on players for update using (auth.uid() = id);
+-- Players
+do $$ begin
+  create policy "players_self_read"  on players for select using (auth.uid() = id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "players_self_write" on players for update using (auth.uid() = id);
+exception when duplicate_object then null; end $$;
 
--- Catches: player owns their catches
-create policy "catches_owner_read"  on catches for select using (auth.uid() = player_id);
-create policy "catches_owner_write" on catches for insert with check (auth.uid() = player_id);
+-- Catches
+do $$ begin
+  create policy "catches_owner_read"  on catches for select using (auth.uid() = player_id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "catches_owner_write" on catches for insert with check (auth.uid() = player_id);
+exception when duplicate_object then null; end $$;
 
--- Public read on vehicle DB (no auth needed to browse)
-alter table makes       enable row level security;
-alter table models      enable row level security;
-alter table generations enable row level security;
-alter table variants    enable row level security;
-
-create policy "makes_public_read"       on makes       for select using (true);
-create policy "models_public_read"      on models      for select using (true);
-create policy "generations_public_read" on generations for select using (true);
-create policy "variants_public_read"    on variants    for select using (true);
-create policy "first_finders_public_read" on first_finders for select using (true);
+-- Public read on vehicle DB
+do $$ begin
+  create policy "makes_public_read"         on makes         for select using (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "models_public_read"        on models        for select using (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "generations_public_read"   on generations   for select using (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "variants_public_read"      on variants      for select using (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "first_finders_public_read" on first_finders for select using (true);
+exception when duplicate_object then null; end $$;
 
 -- ============================================================
 -- UPDATED_AT TRIGGER
@@ -288,6 +308,8 @@ begin
 end;
 $$;
 
-create trigger players_updated_at
-  before update on players
-  for each row execute function set_updated_at();
+do $$ begin
+  create trigger players_updated_at
+    before update on players
+    for each row execute function set_updated_at();
+exception when duplicate_object then null; end $$;

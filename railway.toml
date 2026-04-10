@@ -1,3 +1,14 @@
+# Railway deployment config
+# Three services are deployed from this repo:
+#   1. api        — FastAPI HTTP server (this file)
+#   2. sat-worker — satellite tracking background worker (separate Railway service)
+#   3. osm-seeder — one-shot OSM road seeder (run manually or as Railway cron)
+#
+# To create the worker services in Railway:
+#   railway service create sat-worker
+#   railway service create osm-seeder
+# Then set their start commands in the Railway dashboard (see below).
+
 [build]
 builder = "NIXPACKS"
 
@@ -9,4 +20,10 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
 [deploy.watchPatterns]
-include = ["backend/**", "railway.toml", "nixpacks.toml"]
+include = ["backend/**", "railway.toml"]
+
+# ---------------------------------------------------------------------------
+# Worker service start commands (set these in the Railway dashboard UI)
+# ---------------------------------------------------------------------------
+# sat-worker:  cd backend && python workers/satellite_tracker.py
+# osm-seeder:  cd backend && python workers/osm_seeder.py

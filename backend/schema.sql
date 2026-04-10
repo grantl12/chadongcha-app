@@ -161,16 +161,19 @@ create table id_suggestions (
 -- ============================================================
 
 create table road_segments (
-  id           uuid primary key default uuid_generate_v4(),
-  osm_way_id   bigint unique,              -- OpenStreetMap way ID
-  name         text,
-  city         text,
-  country      text,
-  king_id      uuid references players(id),
-  king_car_id  uuid references generations(id),
+  id              uuid primary key default uuid_generate_v4(),
+  osm_way_id      bigint unique,              -- OpenStreetMap way ID (way_id*1000+seg_idx)
+  name            text,
+  city            text,
+  country         text,
+  centroid_lat    float,                      -- segment midpoint — used for proximity queries
+  centroid_lon    float,
+  geometry_json   text,                       -- GeoJSON LineString for map rendering
+  king_id         uuid references players(id),
+  king_car_id     uuid references generations(id),
   king_scan_count int not null default 0,
-  king_since   timestamptz,
-  created_at   timestamptz not null default now()
+  king_since      timestamptz,
+  created_at      timestamptz not null default now()
 );
 
 create index road_segments_city_idx on road_segments(city);

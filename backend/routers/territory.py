@@ -1,3 +1,6 @@
+import json
+import math
+
 from fastapi import APIRouter, Query
 from postgrest.types import CountMethod
 from db import get_client
@@ -12,36 +15,50 @@ async def nearby_segments(
     radius_km: float = Query(5.0, le=20.0),
 ):
     """
-    Returns road segments near the given coordinates.
-    Segments are pre-seeded from OpenStreetMap data (Phase 7 worker).
-    Until OSM data is loaded this returns an empty list — the mobile
-    map handles that gracefully.
+    Returns road segments near the given coordinates using a bounding-box filter
+    on centroid_lat / centroid_lon. No PostGIS required.
 
-    Simple bounding-box filter (no PostGIS required):
-      1° latitude  ≈ 111 km
-      1° longitude ≈ 111 km × cos(lat)
+    Each segment includes its GeoJSON geometry so the mobile map can render it.
     """
-    import math
     lat_delta = radius_km / 111.0
     lon_delta = radius_km / (111.0 * max(math.cos(math.radians(lat)), 0.01))
 
     db = get_client()
-    result = db.table("road_segments") \
-        .select("*, players(username)") \
+    result = (
+        db.table("road_segments")
+        .select("id, osm_way_id, name, city, country, centroid_lat, centroid_lon, "
+                "geometry_json, king_id, king_scan_count, king_since, "
+                "players(username)")
+        .gte("centroid_lat", lat - lat_delta)
+        .lte("centroid_lat", lat + lat_delta)
+        .gte("centroid_lon", lon - lon_delta)
+        .lte("centroid_lon", lon + lon_delta)
+        .limit(200)
         .execute()
+    )
 
-    # Filter in Python — road_segments has no geometry column yet,
-    # so we filter by city match as a proxy until PostGIS is wired.
-    # Once geometry is stored this becomes a proper spatial query.
-    return result.data or []
+    rows = result.data or []
+    # Parse geometry_json back to dict for the mobile client
+    for row in rows:
+        if row.get("geometry_json"):
+            try:
+                row["geometry"] = json.loads(row["geometry_json"])
+            except (json.JSONDecodeError, TypeError):
+                row["geometry"] = None
+        else:
+            row["geometry"] = None
+
+    return rows
 
 
 @router.get("/stats/{player_id}")
 async def player_territory_stats(player_id: str):
     """Count of roads a player currently holds as Road King."""
     db = get_client()
-    result = db.table("road_segments") \
-        .select("id", count=CountMethod.exact) \
-        .eq("king_id", player_id) \
+    result = (
+        db.table("road_segments")
+        .select("id", count=CountMethod.exact)
+        .eq("king_id", player_id)
         .execute()
+    )
     return {"road_king_count": result.count or 0}

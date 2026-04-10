@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
 import { usePlayerStore } from '@/stores/playerStore';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 function LevelUpBanner({ level }: { level: number }) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -34,6 +35,8 @@ export default function TabsLayout() {
     }
     prevLevel.current = level;
   }, [level]);
+
+  usePushNotifications();
 
   if (!accessToken) return <Redirect href="/onboarding" />;
 

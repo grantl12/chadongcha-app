@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 from db import get_client
 
 router = APIRouter()
@@ -82,3 +83,25 @@ async def me_info(authorization: str = Header(...)):
         "xp": result.data["xp"],
         "level": result.data["level"],
     }
+
+
+class PushTokenRequest(BaseModel):
+    expo_push_token: str
+
+
+@router.post("/push-token")
+async def register_push_token(body: PushTokenRequest, authorization: str = Header(...)):
+    """Register or update the player's Expo push token."""
+    db = get_client()
+    token = authorization.replace("Bearer ", "")
+    try:
+        auth_result = db.auth.get_user(token)
+        if not auth_result or not auth_result.user:
+            raise ValueError()
+        player_id = auth_result.user.id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    db.table("players").update({"expo_push_token": body.expo_push_token}) \
+        .eq("id", player_id).execute()
+    return {"ok": True}

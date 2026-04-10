@@ -4,9 +4,13 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 from db import get_client
-from services.xp_service import compute_xp, apply_xp, session_catch_count, get_orbital_boost
+from services.xp_service import compute_xp, apply_xp, session_catch_count, get_orbital_boost, ROAD_KING_TAKEOVER_XP
 from services.territory_service import record_road_scan
 from services.first_finder_service import check_first_finder
+from services.notification_service import (
+    notify_road_king_taken, notify_road_king_claimed,
+    notify_level_up, notify_first_finder,
+)
 
 # --- Dedup configuration ---
 HASH_DEDUP_MIN_PLATE_CONFIDENCE = 0.85
@@ -155,7 +159,20 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     # Territory
     road_king_claimed = False
     if body.road_segment_id:
+        prev_king = _get_road_king(db, body.road_segment_id)
         road_king_claimed = record_road_scan(db, player_id, body.road_segment_id)
+        if road_king_claimed:
+            road_name = _get_road_name(db, body.road_segment_id)
+            # Notify new king
+            notify_road_king_claimed(db, player_id, road_name, ROAD_KING_TAKEOVER_XP)
+            # Notify dethroned king (if they exist and aren't the same player)
+            if prev_king and prev_king != player_id:
+                player_username = _get_username(db, player_id)
+                notify_road_king_taken(db, prev_king, road_name, player_username)
+
+    # Level-up notification (async best-effort)
+    if level_up:
+        notify_level_up(db, player_id, new_level)
 
     # First finder
     first_finder_awarded = None
@@ -164,6 +181,9 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
             db, player_id, body.generation_id, body.variant_id,
             body.fuzzy_city, catch_id,
         )
+        if first_finder_awarded:
+            vehicle_name = _get_vehicle_name(db, body.generation_id)
+            notify_first_finder(db, player_id, first_finder_awarded.get("badge", ""), vehicle_name)
 
     return {
         "catch_id": catch_id,
@@ -269,3 +289,33 @@ def _is_personal_first(db, player_id: str, generation_id: Optional[str]) -> bool
         .eq("generation_id", generation_id) \
         .execute()
     return (result.count or 0) == 0
+
+
+def _get_road_king(db, road_segment_id: str) -> Optional[str]:
+    result = db.table("road_segments").select("king_id") \
+        .eq("id", road_segment_id).maybe_single().execute()
+    return result.data.get("king_id") if result.data else None
+
+
+def _get_road_name(db, road_segment_id: str) -> str:
+    result = db.table("road_segments").select("name") \
+        .eq("id", road_segment_id).maybe_single().execute()
+    return (result.data.get("name") or "Unknown Road") if result.data else "Unknown Road"
+
+
+def _get_username(db, player_id: str) -> str:
+    result = db.table("players").select("username") \
+        .eq("id", player_id).maybe_single().execute()
+    return (result.data.get("username") or "Someone") if result.data else "Someone"
+
+
+def _get_vehicle_name(db, generation_id: str) -> str:
+    result = db.table("generations") \
+        .select("common_name, models(name, makes(name))") \
+        .eq("id", generation_id).maybe_single().execute()
+    if not result.data:
+        return "Unknown Vehicle"
+    data = result.data
+    model = data.get("models") or {}
+    make  = model.get("makes") or {}
+    return data.get("common_name") or f"{make.get('name', '')} {model.get('name', '')}".strip()

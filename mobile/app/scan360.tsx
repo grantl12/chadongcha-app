@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCatchStore } from '@/stores/catchStore';
 import { VehicleClassifier, VehicleClassifierStub, ClassifyResult } from '@/modules/vehicle-classifier';
+import { useLocation } from '@/hooks/useLocation';
 
 // Auto-detect native module — falls back to stub until Phase 5 implementation
 const Classifier = NativeModules.VehicleClassifierModule
@@ -17,6 +18,7 @@ type Anchor = typeof ANCHORS[number];
 export default function Scan360Screen() {
   const device = useCameraDevice('back');
   const { addCatch } = useCatchStore();
+  const { fuzzyCity } = useLocation();
 
   const [captured, setCaptured]     = useState<Set<Anchor>>(new Set());
   const [currentAnchor, setCurrentAnchor] = useState<Anchor>('FRONT');
@@ -45,7 +47,7 @@ export default function Scan360Screen() {
 
   const handleConfirm = useCallback(() => {
     if (!result) return;
-    addCatch({ ...result, catchType: 'scan360' });
+    addCatch({ ...result, catchType: 'scan360', fuzzyCity: fuzzyCity ?? undefined });
     router.back();
   }, [result, addCatch]);
 

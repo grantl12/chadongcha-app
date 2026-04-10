@@ -25,7 +25,7 @@ const CONFIDENCE_PROBABLE   = 0.50;
 
 export default function HighwayMode() {
   const device = useCameraDevice('back');
-  const { speedMph } = useLocation();
+  const { speedMph, fuzzyCity } = useLocation();
   const { addCatch } = useCatchStore();
 
   const isMoving       = speedMph > SPEED_THRESHOLD_MPH;
@@ -61,7 +61,7 @@ export default function HighwayMode() {
 
   const handleCatch = useCallback((result: ClassifyResult) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addCatch({ ...result, catchType: 'highway' });
+    addCatch({ ...result, catchType: 'highway', fuzzyCity: fuzzyCity ?? undefined });
     showBanner(`CAUGHT: ${result.make} ${result.model} · ${Math.round(result.confidence * 100)}%`);
   }, [addCatch]);
 

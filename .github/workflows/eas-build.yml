@@ -22,6 +22,9 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
         working-directory: mobile
+      - name: Verify EAS auth
+        working-directory: mobile
+        run: eas whoami
       - run: eas build --platform android --profile preview --non-interactive --no-wait
         working-directory: mobile
 
@@ -41,5 +44,8 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
         working-directory: mobile
+      - name: Verify EAS auth
+        working-directory: mobile
+        run: eas whoami
       - run: eas build --platform ios --profile preview --non-interactive --no-wait
         working-directory: mobile

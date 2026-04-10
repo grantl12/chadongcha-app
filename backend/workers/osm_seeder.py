@@ -28,7 +28,12 @@ from db import get_client  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass.openstreetmap.ru/api/interpreter",
+]
 MAX_SEGMENT_LEN_KM = 5.0   # split ways longer than this
 MIN_SEGMENT_LEN_KM = 0.2   # skip tiny stubs
 
@@ -100,14 +105,15 @@ def fetch_ways(bbox: tuple[float, float, float, float]) -> list[dict]:
 );
 out geom;
 """
-    for attempt in range(3):
+    mirrors = OVERPASS_MIRRORS * 2  # two full rotations before giving up
+    for attempt, url in enumerate(mirrors):
         try:
-            resp = httpx.post(OVERPASS_URL, data={"data": query}, timeout=90)
+            resp = httpx.post(url, data={"data": query}, timeout=120)
             resp.raise_for_status()
             return resp.json().get("elements", [])
         except Exception as exc:
-            log.warning("Overpass attempt %d failed: %s", attempt + 1, exc)
-            time.sleep(5 * (attempt + 1))
+            log.warning("Overpass attempt %d (%s) failed: %s", attempt + 1, url, exc)
+            time.sleep(3 * (attempt + 1))
     return []
 
 

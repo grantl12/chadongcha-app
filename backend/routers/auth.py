@@ -28,10 +28,16 @@ async def signup(body: SignUpRequest):
     if not user_id:
         raise HTTPException(status_code=400, detail="Signup failed")
 
-    db.table("players").insert({
-        "id": user_id,
-        "username": body.username,
-    }).execute()
+    try:
+        db.table("players").upsert({
+            "id": user_id,
+            "username": body.username,
+        }, on_conflict="id").execute()
+    except Exception as e:
+        detail = str(e)
+        if "username" in detail.lower():
+            raise HTTPException(status_code=409, detail="Username already taken")
+        raise HTTPException(status_code=500, detail="Could not create player profile")
 
     return {"user_id": user_id, "message": "Check your email to confirm your account"}
 

@@ -23,6 +23,10 @@ web-build/
 mobile/ios/
 mobile/android/
 
+# ML data
+ml/data/images/
+ml/data/images.zip
+
 # Misc
 .DS_Store
 *.log

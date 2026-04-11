@@ -27,7 +27,7 @@ const RARITY_LABEL: Record<string, string> = {
 };
 
 const CATCH_TYPE_LABEL: Record<string, string> = {
-  highway: 'HWY',
+  highway: 'SENTRY',
   scan360: '360°',
   space:   'SPC',
   unknown: '???',

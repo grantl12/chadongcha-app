@@ -27,6 +27,10 @@ mobile/android/
 ml/data/images/
 ml/data/images.zip
 
+# Model binaries — too large for git, drop into mobile/assets/ manually before building
+mobile/assets/vehicle_classifier.mlpackage/
+mobile/assets/vehicle_classifier.tflite
+
 # Misc
 .DS_Store
 *.log

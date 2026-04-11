@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '@/stores/playerStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
@@ -50,11 +51,11 @@ export default function TabsLayout() {
           tabBarInactiveTintColor: '#555',
         }}
       >
-        <Tabs.Screen name="index"   options={{ title: 'Radar' }} />
-        <Tabs.Screen name="garage"  options={{ title: 'Garage' }} />
-        <Tabs.Screen name="map"     options={{ title: 'Roads' }} />
-        <Tabs.Screen name="feed"    options={{ title: 'Feed' }} />
-        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+        <Tabs.Screen name="index"   options={{ title: 'Radar',   tabBarIcon: ({ color, size }) => <Ionicons name="radio-outline"       size={size} color={color} /> }} />
+        <Tabs.Screen name="garage"  options={{ title: 'Garage',  tabBarIcon: ({ color, size }) => <Ionicons name="car-sport-outline"    size={size} color={color} /> }} />
+        <Tabs.Screen name="map"     options={{ title: 'Roads',   tabBarIcon: ({ color, size }) => <Ionicons name="map-outline"          size={size} color={color} /> }} />
+        <Tabs.Screen name="feed"    options={{ title: 'Feed',    tabBarIcon: ({ color, size }) => <Ionicons name="pulse-outline"        size={size} color={color} /> }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} /> }} />
       </Tabs>
       {bannerKey && <LevelUpBanner key={bannerKey} level={bannerKey} />}
     </View>

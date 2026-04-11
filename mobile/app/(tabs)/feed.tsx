@@ -21,10 +21,12 @@ type FeedCatch = {
     rarity_tier: string;
     models: { name: string; makes: { name: string } };
   } | null;
-  space_objects: {
-    name: string;
-    object_type: string;
-    rarity_tier: string;
+  catchable_objects: {
+    space_objects: {
+      name: string;
+      object_type: string;
+      rarity_tier: string;
+    } | null;
   } | null;
 };
 
@@ -80,12 +82,13 @@ function groupBySections(catches: FeedCatch[]): Section[] {
 }
 
 function vehicleInfo(item: FeedCatch) {
-  if (item.catch_type === 'space' && item.space_objects) {
+  const spaceObj = item.catchable_objects?.space_objects;
+  if (item.catch_type === 'space' && spaceObj) {
     return {
       make:    'Space Object',
-      model:   item.space_objects.name,
-      name:    item.space_objects.object_type,
-      rarity:  item.space_objects.rarity_tier,
+      model:   spaceObj.name,
+      name:    spaceObj.object_type,
+      rarity:  spaceObj.rarity_tier,
     };
   }
   const gen   = item.generations;

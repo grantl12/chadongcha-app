@@ -53,7 +53,7 @@ async def recent_catches(
             "id, caught_at, catch_type, confidence, color, body_style, player_id, "
             "players(username), "
             "generations(common_name, rarity_tier, models(name, makes(name))), "
-            "space_objects(name, object_type, rarity_tier)"
+            "catchable_objects(space_objects(name, object_type, rarity_tier))"
         ) \
         .order("caught_at", desc=True) \
         .limit(min(limit, 100))

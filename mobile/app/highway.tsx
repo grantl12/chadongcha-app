@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, AppState, NativeModules, Modal, Pressable } from 'react-native';
-import { Camera, useCameraDevice, useFrameProcessor } from 'react-native-vision-camera';
-import { useSharedValue, runOnJS } from 'react-native-reanimated';
+import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
+import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useLocation } from '@/hooks/useLocation';
@@ -12,17 +11,14 @@ import { PrivacyShield } from '@/components/PrivacyShield';
 import {
   VehicleClassifier,
   VehicleClassifierStub,
+  type ClassifyResult,
 } from '@/modules/vehicle-classifier';
 
-// Auto-detect native module — falls back to stub when native impl is not yet built.
-// Once the CoreML/TFLite integration is wired in Phase 3, this will switch automatically.
-const Classifier = NativeModules.VehicleClassifierModule
-  ? VehicleClassifier
-  : VehicleClassifierStub;
+// Use native CoreML module if available, else fall back to stub.
+const Classifier = VehicleClassifier ?? VehicleClassifierStub;
 
 const SPEED_THRESHOLD_MPH  = 15;
-const TRIGGER_FPS           = 2;    // Stage 1: MobileNet SSD poll rate
-const FRAME_INTERVAL_MS     = 1000 / TRIGGER_FPS;
+const POLL_INTERVAL_MS      = 500;    // classify at ~2fps
 const CONFIDENCE_AUTO_CATCH = 0.72;
 const CONFIDENCE_PROBABLE   = 0.50;
 
@@ -52,49 +48,58 @@ function SafetyInterstitial({ onConfirm }: { onConfirm: () => void }) {
 
 export default function DashSentry() {
   const device = useCameraDevice('back');
+  const cameraRef = useRef<Camera>(null);
+  const classifyingRef = useRef(false);
+
   const { speedMph, fuzzyCity, fuzzyDistrict } = useLocation();
   const { addCatch } = useCatchStore();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostActive = boostRemainingMin(orbitalBoostExpires) > 0;
   const privacyShieldEnabled = useSettingsStore(s => s.privacyShieldEnabled);
+
   const [safetyConfirmed, setSafetyConfirmed] = useState(false);
-
-  const isMoving       = speedMph > SPEED_THRESHOLD_MPH;
-  const lastFrameTime  = useSharedValue(0);
-  const pipelineActive = useSharedValue(false);
-
   const [catchBanner, setCatchBanner] = useState<string | null>(null);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // AA-inspired adaptive throttle: only run full classify when Stage 1 fires
-  const frameProcessor = useFrameProcessor((frame) => {
-    'worklet';
-    const now = Date.now();
-    if (now - lastFrameTime.value < FRAME_INTERVAL_MS) return;
-    if (pipelineActive.value) return;           // already classifying
-    lastFrameTime.value = now;
+  const isMoving = speedMph > SPEED_THRESHOLD_MPH;
 
-    // Stage 1 — lightweight trigger (MobileNet SSD at 2fps)
-    const triggered = Classifier.triggerDetect(frame);
-    if (!triggered) return;
+  // ── Classify loop — snapshot every 500ms, run CoreML, handle result ─────────
+  useEffect(() => {
+    if (!safetyConfirmed) return;
 
-    // Stage 2 — full classify only on trigger (adaptive throttle from AA)
-    pipelineActive.value = true;
-    const result = Classifier.classify(frame);
-    pipelineActive.value = false;
+    const timer = setInterval(async () => {
+      if (classifyingRef.current || !cameraRef.current) return;
+      classifyingRef.current = true;
+      try {
+        const snapshot = await cameraRef.current.takeSnapshot({ quality: 85 });
+        const result   = await Classifier.classify(snapshot.path);
+        if (!result) return;
 
-    if (result && result.confidence >= CONFIDENCE_AUTO_CATCH) {
-      runOnJS(handleCatch)(result);
-    } else if (result && result.confidence >= CONFIDENCE_PROBABLE) {
-      runOnJS(handleProbable)(result);
-    }
-  }, []);
+        if (result.confidence >= CONFIDENCE_AUTO_CATCH) {
+          handleCatch(result);
+        } else if (result.confidence >= CONFIDENCE_PROBABLE) {
+          handleProbable(result);
+        }
+      } catch {
+        // Camera not ready or classify failed — silently skip this frame
+      } finally {
+        classifyingRef.current = false;
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, [safetyConfirmed]);
 
   const handleCatch = useCallback((result: ClassifyResult) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addCatch({ ...result, catchType: 'highway', fuzzyCity: fuzzyCity ?? undefined, fuzzyDistrict: fuzzyDistrict ?? undefined });
+    addCatch({
+      ...result,
+      catchType: 'highway',
+      fuzzyCity:     fuzzyCity     ?? undefined,
+      fuzzyDistrict: fuzzyDistrict ?? undefined,
+    });
     showBanner(`CAUGHT: ${result.make} ${result.model} · ${Math.round(result.confidence * 100)}%`);
-  }, [addCatch]);
+  }, [addCatch, fuzzyCity, fuzzyDistrict]);
 
   const handleProbable = useCallback((result: ClassifyResult) => {
     showBanner(`PROBABLE: ${result.make} ${result.model} — confirm?`);
@@ -116,65 +121,57 @@ export default function DashSentry() {
 
   return (
     <>
-    {!safetyConfirmed && <SafetyInterstitial onConfirm={() => setSafetyConfirmed(true)} />}
-    <View style={styles.container}>
-      {/* Camera — always rendering, frame processor runs at 2fps trigger rate */}
-      <Camera
-        style={StyleSheet.absoluteFill}
-        device={device}
-        isActive
-        frameProcessor={frameProcessor}
-        fps={30}
-      />
+      {!safetyConfirmed && <SafetyInterstitial onConfirm={() => setSafetyConfirmed(true)} />}
 
-      {/* Safety banner — always visible in highway mode */}
-      <View style={styles.safetyBanner}>
-        <Text style={styles.safetyText}>KEEP EYES ON ROAD</Text>
+      <View style={styles.container}>
+        <Camera
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          device={device}
+          isActive
+          photo={false}
+          video={false}
+        />
+
+        {/* Safety banner — always visible */}
+        <View style={styles.safetyBanner}>
+          <Text style={styles.safetyText}>KEEP EYES ON ROAD</Text>
+        </View>
+
+        <PrivacyShield enabled={privacyShieldEnabled} />
+
+        {boostActive && (
+          <View style={styles.boostPill}>
+            <Text style={styles.boostPillText}>⚡ BOOST ACTIVE · {boostRemainingMin(orbitalBoostExpires)}m</Text>
+          </View>
+        )}
+
+        {/* HUD dims above 15mph */}
+        {isMoving ? (
+          <View style={styles.minimalHud}>
+            <View style={styles.radarDot} />
+          </View>
+        ) : (
+          <View style={styles.fullHud}>
+            <Text style={styles.speedLabel}>PARKED · SCANNING</Text>
+          </View>
+        )}
+
+        {catchBanner && (
+          <View style={styles.catchBanner}>
+            <Text style={styles.catchText}>{catchBanner}</Text>
+          </View>
+        )}
+
+        {!isMoving && (
+          <View style={styles.exitButton}>
+            <Text style={styles.exitText} onPress={() => router.back()}>EXIT</Text>
+          </View>
+        )}
       </View>
-
-      {/* Privacy Shield */}
-      <PrivacyShield enabled={privacyShieldEnabled} />
-
-      {/* Orbital Boost indicator */}
-      {boostActive && (
-        <View style={styles.boostPill}>
-          <Text style={styles.boostPillText}>⚡ BOOST ACTIVE · {boostRemainingMin(orbitalBoostExpires)}m</Text>
-        </View>
-      )}
-
-      {/* HUD dims above 15 mph — minimal radar indicator only */}
-      {isMoving ? (
-        <View style={styles.minimalHud}>
-          <View style={styles.radarDot} />
-        </View>
-      ) : (
-        <View style={styles.fullHud}>
-          <Text style={styles.speedLabel}>PARKED · TAP TO SCAN</Text>
-        </View>
-      )}
-
-      {/* Catch notification — audio-only above 15mph, banner always */}
-      {catchBanner && (
-        <View style={styles.catchBanner}>
-          <Text style={styles.catchText}>{catchBanner}</Text>
-        </View>
-      )}
-
-      {/* Exit — only when stationary */}
-      {!isMoving && (
-        <View style={styles.exitButton}>
-          <Text style={styles.exitText} onPress={() => router.back()}>EXIT</Text>
-        </View>
-      )}
-    </View>
     </>
   );
 }
-
-type ClassifyResult = {
-  make: string; model: string; generation: string;
-  bodyStyle: string; color: string; confidence: number;
-};
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#000' },

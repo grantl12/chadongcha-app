@@ -51,6 +51,7 @@ module.exports = {
   plugins: [
     "expo-router",
     "expo-notifications",
+    "./plugins/withVehicleClassifier",
     [
       "react-native-vision-camera",
       {

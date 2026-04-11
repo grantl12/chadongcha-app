@@ -11,9 +11,7 @@
  * For dev without native modules, swap to VehicleClassifierStub below.
  */
 
-import { NativeModules } from 'react-native';
-
-const { VehicleClassifierModule } = NativeModules;
+import { requireOptionalNativeModule } from 'expo-modules-core';
 
 export type ClassifyResult = {
   make: string;
@@ -26,31 +24,15 @@ export type ClassifyResult = {
 };
 
 export interface IVehicleClassifier {
-  /**
-   * Stage 1 — lightweight MobileNet SSD trigger.
-   * Runs at 2fps. Returns true if a vehicle superclass is detected.
-   * Adaptive throttle: caller skips Stage 2 when false (AA pattern).
-   */
-  triggerDetect(frame: unknown): boolean;
+  /** Full ResNet50V2 CoreML classification from a snapshot file path. */
+  classify(imagePath: string): Promise<ClassifyResult | null>;
 
-  /**
-   * Stage 2 — full EfficientNet-Lite B2 classification.
-   * Called only when triggerDetect returns true.
-   * Target: < 60ms on iPhone XS / Snapdragon 778G.
-   */
-  classify(frame: unknown): ClassifyResult | null;
-
-  /**
-   * Load a new model from the app documents directory (OTA update).
-   * Returns true if the swap succeeded without restart.
-   */
-  loadModel(path: string): Promise<boolean>;
-
-  /** Current loaded model version string */
+  /** Version string of the loaded model, or 'stub-0.0.1' when running the stub. */
   modelVersion(): string;
 }
 
-export const VehicleClassifier: IVehicleClassifier = VehicleClassifierModule;
+const NativeClassifier = requireOptionalNativeModule<IVehicleClassifier>('VehicleClassifier');
+export const VehicleClassifier = NativeClassifier as IVehicleClassifier;
 
 // ---------------------------------------------------------------------------
 // Stub — use in Expo Go / dev builds without native modules

@@ -139,8 +139,8 @@ export default function RadarScreen() {
         <Text style={styles.subtitle}>Vehicle hunting · Space objects overhead</Text>
 
         <Pressable style={styles.primaryButton} onPress={() => router.push('/highway')}>
-          <Text style={styles.buttonText}>HIGHWAY MODE</Text>
-          <Text style={styles.buttonSub}>Passive drive-by capture</Text>
+          <Text style={styles.buttonText}>DASH SENTRY</Text>
+          <Text style={styles.buttonSub}>Passive dashcam capture</Text>
         </Pressable>
 
         <Pressable style={styles.secondaryButton} onPress={() => router.push('/scan360')}>

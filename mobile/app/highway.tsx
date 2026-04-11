@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, AppState, NativeModules } from 'react-native';
+import { View, Text, StyleSheet, AppState, NativeModules, Modal, Pressable } from 'react-native';
 import { Camera, useCameraDevice, useFrameProcessor } from 'react-native-vision-camera';
 import { useSharedValue, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -31,13 +31,33 @@ function boostRemainingMin(expires: string | null): number {
   return Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / 60000));
 }
 
-export default function HighwayMode() {
+function SafetyInterstitial({ onConfirm }: { onConfirm: () => void }) {
+  return (
+    <Modal transparent animationType="fade" statusBarTranslucent>
+      <View style={styles.interstitialOverlay}>
+        <View style={styles.interstitialCard}>
+          <Text style={styles.interstitialIcon}>⚠️</Text>
+          <Text style={styles.interstitialTitle}>Passenger Use Only</Text>
+          <Text style={styles.interstitialBody}>
+            To ensure safety, ChaDongCha must be used by passengers only. Please ensure your device is securely mounted and do not interact with the screen while operating a vehicle.
+          </Text>
+          <Pressable style={styles.interstitialButton} onPress={onConfirm}>
+            <Text style={styles.interstitialButtonText}>I am a Passenger</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+export default function DashSentry() {
   const device = useCameraDevice('back');
   const { speedMph, fuzzyCity, fuzzyDistrict } = useLocation();
   const { addCatch } = useCatchStore();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostActive = boostRemainingMin(orbitalBoostExpires) > 0;
   const privacyShieldEnabled = useSettingsStore(s => s.privacyShieldEnabled);
+  const [safetyConfirmed, setSafetyConfirmed] = useState(false);
 
   const isMoving       = speedMph > SPEED_THRESHOLD_MPH;
   const lastFrameTime  = useSharedValue(0);
@@ -95,6 +115,8 @@ export default function HighwayMode() {
   }
 
   return (
+    <>
+    {!safetyConfirmed && <SafetyInterstitial onConfirm={() => setSafetyConfirmed(true)} />}
     <View style={styles.container}>
       {/* Camera — always rendering, frame processor runs at 2fps trigger rate */}
       <Camera
@@ -145,6 +167,7 @@ export default function HighwayMode() {
         </View>
       )}
     </View>
+    </>
   );
 }
 
@@ -169,4 +192,12 @@ const styles = StyleSheet.create({
   exitText:     { color: '#ffffff66', fontSize: 13, letterSpacing: 2 },
   boostPill:    { position: 'absolute', top: 60, left: 24, backgroundColor: '#1a120088', borderWidth: 1, borderColor: '#f59e0b88', borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
   boostPillText:{ color: '#f59e0b', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+
+  interstitialOverlay:    { flex: 1, backgroundColor: '#000000cc', alignItems: 'center', justifyContent: 'center', padding: 32 },
+  interstitialCard:       { backgroundColor: '#111', borderRadius: 16, padding: 28, alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#222' },
+  interstitialIcon:       { fontSize: 36 },
+  interstitialTitle:      { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1, textAlign: 'center' },
+  interstitialBody:       { color: '#aaa', fontSize: 14, lineHeight: 22, textAlign: 'center' },
+  interstitialButton:     { marginTop: 8, backgroundColor: '#e63946', borderRadius: 10, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center' },
+  interstitialButtonText: { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 1 },
 });

@@ -1,8 +1,8 @@
 # 차동차 · ChaDongCha
 
-Pokémon GO for cars. Catch real vehicles with on-device AI, claim roads as territory, hunt satellites as rare collectibles, and battle ghost Road Kings for dominance of your city.
+Your city is a hunting ground. ChaDongCha puts a CoreML-powered spotter in your pocket that identifies real vehicles on the street — make, model, generation — and lets you catch them like collectibles. Claim road segments as territory. Lock eyes on a passing GT-R and pull the trigger before it's gone. Race satellite passes for legendary drops. Dethrone the ghost Road King who owns your block.
 
-Built from scratch. Every line has a story.
+It's Pokémon GO, but the rarest catch just pulled up next to you at a red light.
 
 ---
 

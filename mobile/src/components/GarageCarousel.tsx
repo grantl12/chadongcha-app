@@ -131,7 +131,7 @@ function CarouselCard({
             { perspective: 1000 },
             { translateX: tx },
             { rotateY },
-            { translateZ: isActive ? 0 : TRANSLATE_Z },
+            { translateZ: isActive ? 0 : TRANSLATE_Z } as any,
             { scale },
           ],
         },

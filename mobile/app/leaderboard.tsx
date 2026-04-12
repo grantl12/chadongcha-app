@@ -38,7 +38,7 @@ export default function LeaderboardScreen() {
 
   const cityQ = useQuery<LeaderboardEntry[]>({
     queryKey: ['leaderboard-city', fuzzyCity],
-    queryFn:  () => apiClient.get(`/leaderboard/city/${encodeURIComponent(fuzzyCity)}`) as Promise<LeaderboardEntry[]>,
+    queryFn:  () => apiClient.get(`/leaderboard/city/${encodeURIComponent(fuzzyCity ?? '')}`) as Promise<LeaderboardEntry[]>,
     enabled:  !!fuzzyCity,
     staleTime: 60_000,
   });

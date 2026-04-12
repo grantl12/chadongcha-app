@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
   s.author         = 'ChaDongCha'
   s.homepage       = 'https://github.com/grantl12/ChaDongCha'
   s.license        = 'MIT'
-  s.platforms      = { :ios => '16.0' }
+  s.platforms      = { :ios => '15.1' }
   s.source         = { :path => '.' }
   s.source_files   = 'ios/**/*.swift'
   s.dependency 'ExpoModulesCore'

@@ -76,13 +76,11 @@ function AuthStep({ onSuccess }: { onSuccess: () => void }) {
     try {
       if (mode === 'signup') {
         if (!username) { setError('Username is required.'); setLoading(false); return; }
-        const res = await apiClient.post('/auth/signup', { email, password, username }) as { message?: string };
-        if (res.message?.toLowerCase().includes('check your email')) {
-          setInfo('Account created! Check your email to confirm, then sign in.');
-          setMode('signin');
-          setLoading(false);
-          return;
-        }
+        await apiClient.post('/auth/signup', { email, password, username });
+        setInfo('Account created! Check your email to confirm, then sign in.');
+        setMode('signin');
+        setLoading(false);
+        return;
       }
 
       const signinRes = await apiClient.post('/auth/signin', { email, password }) as {

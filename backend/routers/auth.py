@@ -29,10 +29,25 @@ async def signup(body: SignUpRequest):
         raise HTTPException(status_code=400, detail="Signup failed")
 
     try:
-        db.table("players").upsert({
+        result = db.table("players").upsert({
             "id": user_id,
             "username": body.username,
         }, on_conflict="id").execute()
+        # supabase-py returns empty data (not an exception) when RLS silently
+        # blocks the insert. Treat empty result as a hard failure so the client
+        # knows the account is not usable.
+        if not result.data:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Auth user created but player profile could not be saved. "
+                    "This usually means the database service key is misconfigured "
+                    "or Row Level Security is blocking the insert. "
+                    "Contact support with your email address."
+                ),
+            )
+    except HTTPException:
+        raise
     except Exception as e:
         detail = str(e)
         if "username" in detail.lower():

@@ -265,10 +265,15 @@ alter table variants        enable row level security;
 
 -- Players
 do $$ begin
-  create policy "players_self_read"  on players for select using (auth.uid() = id);
+  create policy "players_self_read"   on players for select using (auth.uid() = id);
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy "players_self_write" on players for update using (auth.uid() = id);
+  -- Service role bypasses RLS, but this policy lets an authenticated user
+  -- insert their own row (needed as a safety net if service key ever misconfigures).
+  create policy "players_self_insert" on players for insert with check (auth.uid() = id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "players_self_write"  on players for update using (auth.uid() = id);
 exception when duplicate_object then null; end $$;
 
 -- Catches

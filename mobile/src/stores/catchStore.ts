@@ -53,14 +53,21 @@ async function resolveGenerationId(
 
 type CatchStore = {
   catches: CatchRecord[];
+  syncError: string | null;
   addCatch: (data: Omit<CatchRecord, 'id' | 'caughtAt' | 'synced' | 'generationId' | 'rarity'>) => void;
   syncPending: () => Promise<void>;
+  clearSyncError: () => void;
 };
 
 export const useCatchStore = create<CatchStore>()(
   persist(
     (set, get) => ({
       catches: [],
+      syncError: null,
+
+      clearSyncError() {
+        set({ syncError: null });
+      },
 
       addCatch(data) {
         const record: CatchRecord = {
@@ -128,8 +135,12 @@ export const useCatchStore = create<CatchStore>()(
                   : c,
               ),
             }));
-          } catch {
-            // Network unavailable — will retry on next call
+          } catch (err: unknown) {
+            // Network unavailable or server error — will retry on next foreground.
+            // Persist the last error message so the UI can surface it.
+            const msg = err instanceof Error ? err.message : 'Sync failed';
+            set({ syncError: msg });
+            break; // stop processing further pending catches this cycle
           }
         }
       },

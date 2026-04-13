@@ -20,7 +20,7 @@ DATA_DIR   = Path(__file__).parent.parent / "data" / "images"
 MODELS_DIR = Path(__file__).parent.parent / "models"
 EXPORT_DIR = Path(__file__).parent.parent / "export"
 
-IMGSZ = 260  # EfficientNet-Lite B2 native resolution
+IMGSZ = 224  # MobileNetV3 native resolution
 
 # Generation taxonomy — top 30 at bootstrap, grows to 300 pre-launch
 # Format: "Make Model GenerationCode"
@@ -80,12 +80,19 @@ def phase_classify(epochs: int):
         print("Run scrape_images.py first.")
         return
 
-    device = (
-        "cuda" if torch.cuda.is_available()
-        else "mps" if torch.backends.mps.is_available()
-        else "cpu"
-    )
-    print(f"Device: {device}")
+    using_directml = False
+    try:
+        import torch_directml
+        device = torch_directml.device()
+        using_directml = True
+        print("Device: DirectML (AMD GPU)")
+    except ImportError:
+        device = (
+            "cuda" if torch.cuda.is_available()
+            else "mps" if torch.backends.mps.is_available()
+            else "cpu"
+        )
+        print(f"Device: {device}")
 
     # ImageNet normalization constants
     MEAN = [0.485, 0.456, 0.406]
@@ -116,13 +123,17 @@ def phase_classify(epochs: int):
     n_val = max(1, int(n * 0.2))
     train_idx, val_idx = indices[n_val:], indices[:n_val]
 
+    # DirectML doesn't support pin_memory; use num_workers=0 to avoid Windows spawn issues
+    n_workers = 0 if using_directml else 4
+    pin = not using_directml
+
     train_loader = DataLoader(
         Subset(train_ds, train_idx),
-        batch_size=32, shuffle=True, num_workers=4, pin_memory=True,
+        batch_size=32, shuffle=True, num_workers=n_workers, pin_memory=pin,
     )
     val_loader = DataLoader(
         Subset(val_ds, val_idx),
-        batch_size=32, shuffle=False, num_workers=4, pin_memory=True,
+        batch_size=32, shuffle=False, num_workers=n_workers, pin_memory=pin,
     )
 
     n_classes = len(train_ds.classes)
@@ -130,7 +141,7 @@ def phase_classify(epochs: int):
     print(f"Train   : {len(train_idx)} images")
     print(f"Val     : {len(val_idx)} images")
 
-    model = timm.create_model("efficientnet_lite2", pretrained=True, num_classes=n_classes)
+    model = timm.create_model("mobilenetv3_large_100", pretrained=True, num_classes=n_classes)
     model = model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
@@ -174,6 +185,7 @@ def phase_classify(epochs: int):
                 {
                     "model_state": model.state_dict(),
                     "classes": train_ds.classes,   # alphabetical dir names
+                    "arch": "mobilenetv3_large_100",
                     "imgsz": IMGSZ,
                     "epoch": epoch,
                     "val_acc": val_acc,
@@ -207,7 +219,8 @@ def phase_export():
     print(f"Loaded checkpoint: {n_classes} classes  imgsz={imgsz}  val_acc={ckpt.get('val_acc', '?'):.3f}")
 
     # Rebuild model
-    backbone = timm.create_model("efficientnet_lite2", pretrained=False, num_classes=n_classes)
+    arch = ckpt.get("arch", "mobilenetv3_large_100")
+    backbone = timm.create_model(arch, pretrained=False, num_classes=n_classes)
     backbone.load_state_dict(ckpt["model_state"])
     backbone.eval()
 

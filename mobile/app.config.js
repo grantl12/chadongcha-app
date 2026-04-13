@@ -29,8 +29,10 @@ module.exports = {
       NSLocationWhenInUseUsageDescription:
         "Chadongcha uses your location to assign catches to road segments and compute satellite passes.",
       NSLocationAlwaysAndWhenInUseUsageDescription:
-        "Highway mode needs background location to track road segments while driving.",
+        "Dash Sentry needs background location to track road segments while driving.",
       NSMotionUsageDescription: "Used for sky pointing in Space Mode.",
+      // Mapbox iOS SDK reads this key from Info.plist at startup
+      MBXAccessToken: process.env.MAPBOX_PUBLIC_TOKEN ?? "",
     },
   },
   android: {

@@ -7,7 +7,7 @@
  */
 
 import {
-  useRef, useState, useCallback,
+  useRef, useState, useCallback, useEffect,
 } from 'react';
 import {
   View, Text, StyleSheet, Animated, PanResponder,
@@ -177,7 +177,6 @@ function CarouselCard({
 export function GarageCarousel({ catches }: { catches: CatchRecord[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const dragX  = useRef(new Animated.Value(0)).current;
-  const snapAnim = useRef(new Animated.Value(0)).current;
 
   const goTo = useCallback((idx: number) => {
     const clamped = Math.max(0, Math.min(catches.length - 1, idx));
@@ -185,18 +184,26 @@ export function GarageCarousel({ catches }: { catches: CatchRecord[] }) {
     dragX.setValue(0);
   }, [catches.length, dragX]);
 
+  // Keep refs current so the pan responder (created once) always sees fresh values
+  const activeIndexRef = useRef(activeIndex);
+  const goToRef = useRef(goTo);
+  useEffect(() => { activeIndexRef.current = activeIndex; }, [activeIndex]);
+  useEffect(() => { goToRef.current = goTo; }, [goTo]);
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      // Don't claim touch at start — lets child Pressables receive taps
+      onStartShouldSetPanResponder: () => false,
+      // Only claim after meaningful horizontal movement
       onMoveShouldSetPanResponder:  (_, g) => Math.abs(g.dx) > 8,
       onPanResponderMove: (_, g) => {
         dragX.setValue(g.dx);
       },
       onPanResponderRelease: (_, g) => {
         if (g.dx < -SWIPE_THRESHOLD) {
-          goTo(activeIndex + 1);
+          goToRef.current(activeIndexRef.current + 1);
         } else if (g.dx > SWIPE_THRESHOLD) {
-          goTo(activeIndex - 1);
+          goToRef.current(activeIndexRef.current - 1);
         } else {
           Animated.spring(dragX, { toValue: 0, useNativeDriver: false, tension: 120, friction: 8 }).start();
         }

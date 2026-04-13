@@ -17,7 +17,7 @@ type AuthMode = 'signin' | 'signup';
 // ─── Splash ──────────────────────────────────────────────────────────────────
 
 const FEATURES = [
-  { icon: '🚗', title: 'Highway Mode',   body: 'Passive drive-by capture — just drive.' },
+  { icon: '🚗', title: 'Dash Sentry',    body: 'Passive dashcam capture — just drive.' },
   { icon: '🔍', title: '360° Scan',      body: 'Walk around parked cars for bonus XP.' },
   { icon: '🛰',  title: 'Space Objects', body: 'Catch satellites overhead for an XP boost.' },
   { icon: '🗺',  title: 'Road King',     body: 'Own the roads you drive most.' },
@@ -207,7 +207,7 @@ const PERM_CONFIG = [
     key: 'camera' as const,
     icon: '📷',
     title: 'Camera',
-    body: 'Required for Highway Mode and 360° Scan.',
+    body: 'Required for Dash Sentry and 360° Scan.',
     request: async () => {
       const status = await Camera.requestCameraPermission();
       return status === 'granted' ? 'granted' : 'denied';

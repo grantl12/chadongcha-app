@@ -7,8 +7,6 @@ import { useCatchStore } from '@/stores/catchStore';
 import { VehicleClassifier, VehicleClassifierStub, type ClassifyResult } from '@/modules/vehicle-classifier';
 import { useLocation } from '@/hooks/useLocation';
 import { usePlayerStore } from '@/stores/playerStore';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { PrivacyShield } from '@/components/PrivacyShield';
 
 const Classifier = VehicleClassifier ?? VehicleClassifierStub;
 
@@ -28,7 +26,6 @@ export default function Scan360Screen() {
   const { fuzzyCity, fuzzyDistrict } = useLocation();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostMins = boostRemainingMin(orbitalBoostExpires);
-  const privacyShieldEnabled = useSettingsStore(s => s.privacyShieldEnabled);
 
   const [captured, setCaptured]         = useState<Set<Anchor>>(new Set());
   const [currentAnchor, setCurrentAnchor] = useState<Anchor>('FRONT');
@@ -45,14 +42,20 @@ export default function Scan360Screen() {
     if (nextIndex < ANCHORS.length) {
       setCurrentAnchor(ANCHORS[nextIndex]);
     } else {
-      // All four anchors captured — classify using the final frame
+      // All four anchors captured — classify using a photo
       setClassifying(true);
       try {
-        const snapshot = await cameraRef.current?.takeSnapshot({ quality: 90 });
-        const classification = snapshot
-          ? await Classifier.classify(snapshot.path)
+        const photo = await cameraRef.current?.takePhoto();
+        const CLASSIFY_TIMEOUT_MS = 15_000;
+        const classification = photo
+          ? await Promise.race([
+              Classifier.classify(photo.path),
+              new Promise<null>((_, reject) =>
+                setTimeout(() => reject(new Error('classify timeout')), CLASSIFY_TIMEOUT_MS)
+              ),
+            ])
           : null;
-        setResult(classification);
+        setResult(classification as ClassifyResult | null);
         if (classification) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {
         setResult(null);
@@ -94,10 +97,8 @@ export default function Scan360Screen() {
         style={StyleSheet.absoluteFill}
         device={device}
         isActive
-        photo={false}
-        video={false}
+        photo={true}
       />
-      <PrivacyShield enabled={privacyShieldEnabled} />
 
       {boostMins > 0 && (
         <View style={styles.boostPill}>
@@ -127,7 +128,7 @@ export default function Scan360Screen() {
             <ActivityIndicator color="#e63946" style={{ marginBottom: 8 }} />
           ) : null}
           <Text style={styles.instructionText}>
-            {classifying ? 'CLASSIFYING…' : `POINT AT ${currentAnchor} OF VEHICLE`}
+            {classifying ? 'CLASSIFYING…' : `CAPTURE ${currentAnchor} SIDE`}
           </Text>
         </View>
       )}

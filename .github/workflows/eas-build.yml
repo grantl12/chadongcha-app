@@ -13,9 +13,34 @@ on:
         options: [all, android, ios]
 
 jobs:
+  cancel-pending:
+    name: Cancel pending preview builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Cancel queued/in-progress preview builds
+        working-directory: mobile
+        run: |
+          PENDING=$(eas build:list --status=new --profile=preview --json --non-interactive 2>/dev/null | jq -r '.[].id' || true)
+          IN_PROGRESS=$(eas build:list --status=in-progress --profile=preview --json --non-interactive 2>/dev/null | jq -r '.[].id' || true)
+          for id in $PENDING $IN_PROGRESS; do
+            echo "Cancelling build $id"
+            eas build:cancel $id --non-interactive || true
+          done
+
   android:
     name: Android — Preview APK
     runs-on: ubuntu-latest
+    needs: cancel-pending
     if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'android' }}
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +64,7 @@ jobs:
   ios:
     name: iOS — Preview IPA
     runs-on: ubuntu-latest
+    needs: cancel-pending
     if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'ios' }}
     steps:
       - uses: actions/checkout@v4

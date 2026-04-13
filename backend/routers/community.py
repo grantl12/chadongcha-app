@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 from db import get_client
+from services.xp_service import compute_xp, apply_xp, SCAN_360_MULTIPLIER
 
 router = APIRouter()
 
@@ -260,7 +261,37 @@ def _maybe_auto_confirm(db, unknown_catch_id: str) -> None:
         .eq("id", unknown_catch_id) \
         .maybe_single() \
         .execute()
-    if unk and unk.data:
-        db.table("catches").update({
-            "generation_id": winning_gen,
-        }).eq("id", unk.data["catch_id"]).execute()
+    if not (unk and unk.data):
+        return
+
+    catch_id = unk.data["catch_id"]
+    db.table("catches").update({
+        "generation_id": winning_gen,
+    }).eq("id", catch_id).execute()
+
+    # Award retroactive XP to the original catcher.
+    # We skip personal-first and orbital-boost multipliers since those
+    # windows have passed — just the base rarity XP for the catch type.
+    catch_row = db.table("catches") \
+        .select("player_id, catch_type") \
+        .eq("id", catch_id) \
+        .maybe_single() \
+        .execute()
+    gen_row = db.table("generations") \
+        .select("rarity_tier") \
+        .eq("id", winning_gen) \
+        .maybe_single() \
+        .execute()
+
+    if catch_row and catch_row.data and gen_row and gen_row.data:
+        xp, reasons = compute_xp(
+            catch_type=catch_row.data["catch_type"],
+            generation_id=winning_gen,
+            rarity_tier=gen_row.data["rarity_tier"],
+        )
+        if xp > 0:
+            reasons.append("community_id_confirmed")
+            try:
+                apply_xp(db, catch_row.data["player_id"], xp, catch_id, reasons)
+            except Exception:
+                pass   # XP award is best-effort — don't fail the confirmation

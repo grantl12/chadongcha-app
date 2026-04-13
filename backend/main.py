@@ -27,6 +27,7 @@ app.include_router(uploads.router,       prefix="/uploads",    tags=["uploads"])
 app.include_router(community.router,     prefix="/community",  tags=["community"])
 
 
+@app.get("/")
 @app.get("/health")
 def health():
     return {"status": "ok"}

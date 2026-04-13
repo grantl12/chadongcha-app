@@ -186,7 +186,11 @@ export default function Scan360Screen() {
           <Text style={styles.resultMake}>{result.make}</Text>
           <Text style={styles.resultModel}>{result.model}</Text>
           <Text style={styles.resultGen}>{result.generation}</Text>
-          <Text style={styles.resultColor}>{result.color}  ·  {result.bodyStyle}</Text>
+          {(result.color || result.bodyStyle) ? (
+            <Text style={styles.resultColor}>
+              {[result.color, result.bodyStyle].filter(Boolean).join('  ·  ')}
+            </Text>
+          ) : null}
           <Text style={styles.resultConfidence}>{Math.round(result.confidence * 100)}% confidence</Text>
           <View style={styles.resultActions}>
             <Pressable style={styles.rescanButton} onPress={handleRescan}>

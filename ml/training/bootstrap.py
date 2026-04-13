@@ -148,7 +148,7 @@ def phase_classify(epochs: int, resume: bool = False):
     model = timm.create_model("mobilenetv3_large_100", pretrained=True, num_classes=n_classes)
 
     if resume and checkpoint_path.exists():
-        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         model.load_state_dict(ckpt["model_state"])
         best_acc    = ckpt.get("val_acc", 0.0)
         start_epoch = ckpt.get("epoch", 0) + 1
@@ -218,9 +218,8 @@ def phase_export():
         import torch
         import torch.nn as nn
         import timm
-        import coremltools as ct
     except ImportError:
-        print("Install deps: pip install torch timm coremltools onnx")
+        print("Install deps: pip install torch timm onnx")
         return
 
     checkpoint_path = MODELS_DIR / "best.pt"
@@ -228,7 +227,7 @@ def phase_export():
         print(f"No checkpoint at {checkpoint_path}. Run --phase classify first.")
         return
 
-    ckpt      = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    ckpt      = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     classes   = ckpt["classes"]
     imgsz     = ckpt.get("imgsz", IMGSZ)
     n_classes = len(classes)
@@ -263,35 +262,36 @@ def phase_export():
     dummy = torch.zeros(1, 3, imgsz, imgsz)
 
     # ------------------------------------------------------------------
-    # CoreML (.mlpackage)
+    # CoreML (.mlpackage) — macOS/Linux only
     # ------------------------------------------------------------------
-    print("\nExporting to CoreML…")
-    traced = torch.jit.trace(model, dummy)
-
-    coreml_model = ct.convert(
-        traced,
-        inputs=[
-            ct.ImageType(
-                name="image",
-                shape=(1, 3, imgsz, imgsz),
-                scale=1 / 255.0,        # pixel → [0, 1]; model handles normalization
-                bias=[0, 0, 0],
-                color_layout=ct.colorlayout.RGB,
-            )
-        ],
-        outputs=[ct.TensorType(name="logits")],
-        classifier_config=ct.ClassifierConfig(classes),
-        minimum_deployment_target=ct.target.iOS15,
-        convert_to="mlprogram",
-    )
-
-    coreml_model.short_description = "Chadongcha vehicle generation classifier"
-    coreml_model.author            = "Chadongcha"
-    coreml_model.version           = "0.1.0"
-
-    coreml_path = EXPORT_DIR / "vehicle_classifier.mlpackage"
-    coreml_model.save(str(coreml_path))
-    print(f"CoreML saved → {coreml_path}")
+    try:
+        import coremltools as ct
+        print("\nExporting to CoreML…")
+        traced = torch.jit.trace(model, dummy)
+        coreml_model = ct.convert(
+            traced,
+            inputs=[
+                ct.ImageType(
+                    name="image",
+                    shape=(1, 3, imgsz, imgsz),
+                    scale=1 / 255.0,
+                    bias=[0, 0, 0],
+                    color_layout=ct.colorlayout.RGB,
+                )
+            ],
+            outputs=[ct.TensorType(name="logits")],
+            classifier_config=ct.ClassifierConfig(classes),
+            minimum_deployment_target=ct.target.iOS15,
+            convert_to="mlprogram",
+        )
+        coreml_model.short_description = "Chadongcha vehicle generation classifier"
+        coreml_model.author            = "Chadongcha"
+        coreml_model.version           = "0.1.0"
+        coreml_path = EXPORT_DIR / "vehicle_classifier.mlpackage"
+        coreml_model.save(str(coreml_path))
+        print(f"CoreML saved → {coreml_path}")
+    except (ImportError, RuntimeError, Exception) as e:
+        print(f"\nSkipping CoreML export (not supported on this platform: {e})")
 
     # ------------------------------------------------------------------
     # ONNX (TFLite conversion path — run onnx2tf or ai_edge_torch separately)

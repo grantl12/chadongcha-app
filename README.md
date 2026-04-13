@@ -1,8 +1,10 @@
 # 차동차 · ChaDongCha
 
-Your city is a hunting ground. ChaDongCha puts a CoreML-powered spotter in your pocket that identifies real vehicles on the street — make, model, generation — and lets you catch them like collectibles. Claim road segments as territory. Lock eyes on a passing GT-R and pull the trigger before it's gone. Race satellite passes for legendary drops. Dethrone the ghost Road King who owns your block.
+There's a GT-R idling at the light next to you. You have three seconds.
 
-It's Pokémon GO, but the rarest catch just pulled up next to you at a red light.
+ChaDongCha is a street-level vehicle hunting game. A CoreML classifier runs on-device, identifies what's rolling past — make, model, generation — and lets you catch it like a collectible. Every street you scan belongs to someone. Satellite passes drop orbital boosts. The first player to catch a generation in your city gets a badge that never expires.
+
+It's Pokémon GO, but the rarest catch just pulled up next to you.
 
 ---
 
@@ -26,16 +28,17 @@ chadongcha/
 │   ├── src/
 │   │   ├── stores/      catchStore (offline-first), playerStore, settingsStore
 │   │   ├── hooks/       useLocation, usePushNotifications
-│   │   ├── components/  PrivacyShield
+│   │   ├── components/  GarageCarousel, PrivacyShield
 │   │   ├── utils/       plateHash.ts
 │   │   └── modules/     vehicle-classifier (stub + native CoreML interface)
 │   ├── modules/
-│   │   └── vehicle-classifier/   Expo native module — ResNet50V2 CoreML + Vision
+│   │   └── vehicle-classifier/   Expo native module — MobileNetV3 CoreML + Vision
 │   └── plugins/
 │       └── withVehicleClassifier.js   prebuild: copies model into iOS bundle
 └── ml/
-    ├── training/        train_colab.ipynb
-    └── data/            scrape_stats.json (images/ and .zip are gitignored)
+    ├── training/        bootstrap.py (local GPU training via torch-directml)
+    ├── models/          best.pt (MobileNetV3, 92.6% val_acc, 30 classes)
+    └── export/          vehicle_classifier.mlpackage + .onnx + manifest.json
 ```
 
 ---
@@ -44,19 +47,24 @@ chadongcha/
 
 **Backend:** FastAPI · Supabase (Postgres + Auth + RLS) · Railway · Expo Push API · Celestrak TLEs  
 **Mobile:** Expo SDK 52 · Expo Router · React Query · Zustand · VisionCamera v4 · Mapbox (`@rnmapbox/maps ~10.2.10`)  
-**ML:** ResNet50V2 fine-tuned in Keras (Google Colab) · exported to CoreML `.mlpackage` (iOS) + TFLite int8 (Android)  
-**CI:** GitHub Actions → EAS cloud builds (manual `workflow_dispatch`)
+**ML:** MobileNetV3-Large fine-tuned locally (AMD GPU via torch-directml) · 92.6% val_acc · 30 classes · exported to CoreML `.mlpackage` (iOS) + ONNX  
+**CI:** GitHub Actions → EAS cloud builds (auto-trigger on push, cancels stale queue)
 
 ---
 
 ## Game Modes
 
-| Mode | What it does |
-|------|--------------|
-| **Dash Sentry** | Mount your phone, tap "I am a Passenger," and go. The app snapshots the camera at 2fps, runs CoreML on each frame, and catches vehicles automatically. Minimal HUD at speed — just a red radar dot. Fully passive. |
-| **360° Scan** | Walk around a parked car. High-confidence, deliberate catch for car shows, parking lots, your own driveway. |
-| **Road King** | Every road segment is territory. The player with the most scans in 30 days holds the crown. Map shows owned roads glowing red (yours) or blue (theirs). Ghost kings seed cities before real players arrive. |
-| **Space Mode** | ISS and satellite passes computed from live TLEs via SGP4. Catchable for a narrow time window. Catching one activates **Orbital Boost** — an XP multiplier (1.25×–2.0×) on all subsequent vehicle catches. |
+**Dash Sentry** — Mount your phone. Tap "I am a Passenger." Drive.  
+The app snapshots the camera at 2fps, runs CoreML inference on every frame, and catches vehicles automatically. Nothing to tap. No HUD to stare at. Just a red radar dot pulsing in the corner and XP stacking up while the highway blurs past. Ghost kings already own every road — go take them back.
+
+**360° Scan** — Walk around the car. Four anchors: front, passenger, rear, driver.  
+One snapshot per side, then the model classifies from the final frame. Highest confidence catches in the game. Built for car shows, parking lots, and the Ferrari you spotted outside the hotel.
+
+**Road King** — Every road segment is territory, and right now someone else owns yours.  
+The player with the most scans in 30 days holds the crown. Unclaimed roads glow dim on the map. Yours glow red. Take enough roads in a city and your name shows up on the leaderboard. Ghost kings seed the map from day one so it never feels empty — but they're easy to beat. Real players aren't.
+
+**Space Mode** — The ISS just crested the horizon. You have four minutes.  
+Live TLE data from Celestrak, SGP4 propagation, push notification 5 minutes before each pass. Catch it and activate **Orbital Boost** — an XP multiplier on every vehicle catch for the next hour. Miss the window and it's gone until the next orbit.
 
 ---
 
@@ -66,14 +74,17 @@ chadongcha/
 On-Device (React Native)
 │
 ├── Dash Sentry (highway.tsx)
-│   ├── VisionCamera preview (live feed, no frame processor)
-│   ├── 500ms snapshot timer → takeSnapshot() → classify(imagePath)
+│   ├── VisionCamera preview at 2fps → takePhoto() → classify(imagePath)
 │   └── VehicleClassifierModule (Swift + CoreML + Vision framework)
-│       ├── Loads ResNet50V2 .mlpackage from iOS bundle at startup
+│       ├── Loads MobileNetV3 .mlpackage from iOS bundle at startup
 │       ├── VNCoreMLRequest with centerCrop preprocessing
 │       └── Returns { make, model, generation, confidence } via Promise
 │
-├── Privacy Shield  — geometric overlay on windshield/window bands
+├── 360° Scan (scan360.tsx)
+│   ├── Four anchor captures → final frame classify with 15s timeout
+│   └── Same VehicleClassifierModule pipeline
+│
+├── Privacy Shield  — geometric overlay on windshield/window bands (Dash Sentry only)
 ├── Plate Hash      — opt-in SHA-256 on-device; hash used for dedup + spotter award
 │                     Plate text never stored or transmitted
 │
@@ -141,7 +152,7 @@ Diminishing XP applies when catching the same generation multiple times in a 24h
 Three tiers, applied in order:
 
 1. **Hash** — SHA-256(plate) within 4hr window, only when plate ALPR confidence ≥ 85%
-2. **Fuzzy** — same `generation_id` + `fuzzy_district`, 20 min window (highway), 3 min (scan360)
+2. **Fuzzy** — same `generation_id` + `fuzzy_district`, 20 min window (Dash Sentry), 3 min (360° Scan)
 3. **Scan360 gap** — physically can't walk around the same car twice in under 3 minutes
 
 Duplicate catches are still recorded — it's a real sighting — just no XP.
@@ -152,37 +163,31 @@ Duplicate catches are still recorded — it's a real sighting — just no XP.
 
 - **Plate text:** zeroed at ALPR module boundary. One-way SHA-256 on-device only.
 - **Location:** `fuzzy_city` and `fuzzy_district` only. No lat/lon on catch records. Geocoding throttled to once per 500m of movement.
-- **Privacy Shield:** geometric overlay over windshield and window bands. Future: real-time face detection bounding boxes.
+- **Privacy Shield:** geometric overlay over windshield and window bands during Dash Sentry. Future: real-time face detection bounding boxes.
 - **Plate hash opt-in:** 100% user-driven. App hashes on-device before transmitting. Raw plate never leaves the phone.
 
 ---
 
 ## ML
 
-**Model:** ResNet50V2 fine-tuned on 30 vehicle classes (~3,600 images scraped from web).  
-**Training:** Google Colab (GPU), Keras, ImageDataGenerator.  
-**Export:** Keras → CoreML `.mlpackage` via `coremltools` (iOS Neural Engine) + TFLite int8 (Android).  
+**Model:** MobileNetV3-Large fine-tuned on 30 vehicle generation classes (~3,600 images).  
+**Training:** Local GPU via `torch-directml` (AMD RX 5700 XT). 92.6% val_acc at epoch 25 on a 80/20 split. Training script: `ml/training/bootstrap.py`.  
+**Export:** PyTorch → CoreML `.mlpackage` via `coremltools` (iOS Neural Engine) + ONNX.  
 **Integration:** `VehicleClassifierModule` (Swift, Expo Modules API) loads the model at startup, runs `VNCoreMLRequest` on each snapshot, and resolves a Promise back to JS.  
-**Stub:** `VehicleClassifierStub` (weighted random from full vehicle catalog) is auto-selected in dev builds when the native module is absent.
+**Stub:** `VehicleClassifierStub` (weighted random from full vehicle catalog, volume-weighted by annual sales) is auto-selected in dev builds when the native module is absent.
 
-To retrain: see `ml/training/train_colab.ipynb`. To re-export:
+To retrain:
 
-```python
-import coremltools as ct, tensorflow as tf, json
+```bash
+# Train (Windows, AMD GPU)
+python ml/training/bootstrap.py --phase classify --epochs 50
 
-model = tf.keras.models.load_model('best_model_resnet50v2_fine_tuned.keras')
-with open('class_map.json') as f:
-    labels = [json.load(f)[str(i)] for i in range(30)]
+# Resume from checkpoint
+python ml/training/bootstrap.py --phase classify --epochs 20 --resume
 
-ct.convert(
-    model,
-    inputs=[ct.ImageType(name="image", shape=(1,224,224,3), scale=1/127.5, bias=[-1,-1,-1])],
-    classifier_config=ct.ClassifierConfig(labels),
-    compute_units=ct.ComputeUnit.ALL,
-).save('vehicle_classifier.mlpackage')
+# Export (generates .mlpackage + .onnx)
+python ml/training/bootstrap.py --phase export
 ```
-
-Drop `vehicle_classifier.mlpackage` and `class_map.json` into `mobile/assets/` before building.
 
 ---
 
@@ -264,9 +269,9 @@ python scripts/seed_ai_rivals.py --city Seoul --density 0.30
 | FastAPI: auth, catches, XP, territory, satellites, players, leaderboard | ✅ |
 | Three-tier catch dedup (hash → fuzzy → scan360 gap) | ✅ |
 | Vehicle DB (~291 generations, 40 makes) | ✅ |
-| EAS builds (iOS + Android, manual trigger) | ✅ |
+| EAS builds (iOS + Android, auto-trigger on push, cancels stale queue) | ✅ |
 | Feed tab (date sections, GLOBAL/MINE, rarity colors, space catches) | ✅ |
-| Garage tab (grid, rarity cards, XP badge, first finder) | ✅ |
+| Garage tab (3D coverflow carousel, rarity cards, XP badge, first finder) | ✅ |
 | Vehicle detail page (personal stats, recent sightings, rarity tint) | ✅ |
 | Roads / territory map (Mapbox LineLayer, road king sheet, claim progress) | ✅ |
 | Radar tab (satellite list, countdown, CATCH button, orbital boost) | ✅ |
@@ -279,14 +284,14 @@ python scripts/seed_ai_rivals.py --city Seoul --density 0.30
 | Orbital Boost (space catch → multiplier, amber HUD pill) | ✅ |
 | Push notifications (road king, level up, first finder, spotted, boost) | ✅ |
 | AI rival Road Kings (seed script, ghost territory) | ✅ |
-| Privacy Shield (geometric overlay) | ✅ |
+| Privacy Shield (geometric overlay, Dash Sentry only) | ✅ |
 | Plate hash opt-in (on-device SHA-256, spotter award) | ✅ |
 | fuzzyDistrict dedup (reverse geocode, 500m throttle) | ✅ |
 | Dash Sentry safety interstitial (App Store compliant) | ✅ |
-| Tab icons (Ionicons — radar, car, map, pulse, person) | ✅ |
-| App icon | ✅ |
-| ResNet50V2 training (30 classes, Keras, Colab) | ✅ |
-| CoreML native module (Swift, Expo Modules API, VNCoreMLRequest) | 🔧 needs `.mlpackage` drop-in + rebuild |
+| MobileNetV3 training (30 classes, 92.6% val_acc, local AMD GPU) | ✅ |
+| CoreML export (.mlpackage in repo, ready for iOS bundle drop-in) | ✅ |
+| CoreML native module (Swift, Expo Modules API, VNCoreMLRequest) | 🔧 needs EAS build with .mlpackage wired in |
+| iOS Mapbox (token in Info.plist, needs new build) | 🔧 awaiting EAS build |
 | TFLite Android classifier | 🔧 after iOS is validated |
 | Privacy Shield face detection (real bounding boxes) | 🔧 backlog |
 | Privacy Shield surface projection (windows/windshield AR) | 🔧 backlog |
@@ -298,6 +303,6 @@ python scripts/seed_ai_rivals.py --city Seoul --density 0.30
 
 ## CI
 
-EAS builds are **manual only** (`workflow_dispatch`) — preserves build quota. Trigger via GitHub Actions UI with `platform` input (`all` / `ios` / `android`).
+EAS builds trigger automatically on every push to `main`. A `cancel-pending` job runs first and kills any queued or in-progress preview builds before queuing new ones — keeps the free-tier build queue clean.
 
 Type-checking: `mypy backend/`. Lint: `ruff check backend/`.

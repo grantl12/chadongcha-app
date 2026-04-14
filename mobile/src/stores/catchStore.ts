@@ -68,6 +68,7 @@ type CatchStore = {
   catches: CatchRecord[];
   syncError: string | null;
   addCatch: (data: AddCatchData) => void;
+  removeCatch: (catchId: string) => void;
   syncPending: () => Promise<void>;
   clearSyncError: () => void;
 };
@@ -80,6 +81,10 @@ export const useCatchStore = create<CatchStore>()(
 
       clearSyncError() {
         set({ syncError: null });
+      },
+
+      removeCatch(catchId: string) {
+        set(s => ({ catches: s.catches.filter(c => c.id !== catchId) }));
       },
 
       addCatch(data) {

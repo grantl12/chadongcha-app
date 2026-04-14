@@ -16,10 +16,12 @@ import {
 // Use native CoreML module if available, else fall back to stub.
 const Classifier = VehicleClassifier ?? VehicleClassifierStub;
 
-const SPEED_THRESHOLD_MPH  = 15;
-const POLL_INTERVAL_MS      = 500;    // classify at ~2fps
-const CONFIDENCE_AUTO_CATCH = 0.80;   // raised — model hallucinates below this
-const CONFIDENCE_PROBABLE   = 0.65;   // raised from 0.50
+const SPEED_THRESHOLD_MPH         = 15;
+const POLL_INTERVAL_MS            = 500;
+const CONFIDENCE_AUTO_CATCH       = 0.80;
+const CONFIDENCE_PROBABLE         = 0.65;
+// Scan boost lowers thresholds by this much
+const SCAN_BOOST_REDUCTION        = 0.05;
 
 function boostRemainingMin(expires: string | null): number {
   if (!expires) return 0;
@@ -91,7 +93,11 @@ export default function DashSentry() {
   const { speedMph, fuzzyCity, fuzzyDistrict } = useLocation();
   const { addCatch } = useCatchStore();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
-  const boostActive = boostRemainingMin(orbitalBoostExpires) > 0;
+  const scanBoostExpires    = usePlayerStore(s => s.scanBoostExpires);
+  const boostActive    = boostRemainingMin(orbitalBoostExpires) > 0;
+  const scanBoostActive = !!scanBoostExpires && new Date(scanBoostExpires) > new Date();
+  const autoCatchThreshold = CONFIDENCE_AUTO_CATCH - (scanBoostActive ? SCAN_BOOST_REDUCTION : 0);
+  const probableThreshold  = CONFIDENCE_PROBABLE   - (scanBoostActive ? SCAN_BOOST_REDUCTION : 0);
 
   const [catchFlash, setCatchFlash] = useState<'catch' | null>(null);
   const catchFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -114,9 +120,9 @@ export default function DashSentry() {
         const result   = await Classifier.classify(snapshot.path);
         if (!result) return;
 
-        if (result.confidence >= CONFIDENCE_AUTO_CATCH) {
+        if (result.confidence >= autoCatchThreshold) {
           handleCatch(result);
-        } else if (result.confidence >= CONFIDENCE_PROBABLE) {
+        } else if (result.confidence >= probableThreshold) {
           handleProbable(result);
         }
       } catch {
@@ -185,6 +191,11 @@ export default function DashSentry() {
             <Text style={styles.boostPillText}>⚡ BOOST ACTIVE · {boostRemainingMin(orbitalBoostExpires)}m</Text>
           </View>
         )}
+        {scanBoostActive && (
+          <View style={[styles.boostPill, styles.scanBoostPill]}>
+            <Text style={styles.scanBoostPillText}>📡 SCAN BOOST</Text>
+          </View>
+        )}
 
         {/* HUD dims above 15mph */}
         {isMoving ? (
@@ -229,8 +240,10 @@ const styles = StyleSheet.create({
   catchText:    { color: '#fff', fontWeight: '700', fontSize: 15, textAlign: 'center' },
   exitButton:   { position: 'absolute', top: 60, right: 24 },
   exitText:     { color: '#ffffff66', fontSize: 13, letterSpacing: 2 },
-  boostPill:    { position: 'absolute', top: 60, left: 24, backgroundColor: '#1a120088', borderWidth: 1, borderColor: '#f59e0b88', borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
-  boostPillText:{ color: '#f59e0b', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  boostPill:        { position: 'absolute', top: 60, left: 24, backgroundColor: '#1a120088', borderWidth: 1, borderColor: '#f59e0b88', borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
+  boostPillText:    { color: '#f59e0b', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  scanBoostPill:    { top: 96, backgroundColor: '#001a1a88', borderColor: '#4a9eff88' },
+  scanBoostPillText:{ color: '#4a9eff', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
 
   interstitialOverlay:    { flex: 1, backgroundColor: '#000000cc', alignItems: 'center', justifyContent: 'center', padding: 32 },
   interstitialCard:       { backgroundColor: '#111', borderRadius: 16, padding: 28, alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#222' },

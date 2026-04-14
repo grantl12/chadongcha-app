@@ -338,6 +338,10 @@ exception when duplicate_object then null; end $$;
 -- ============================================================
 
 alter table players add column if not exists credits bigint not null default 0;
+-- Shop consumable boosts — set/extended when a player buys from the shop
+alter table players add column if not exists xp_boost_expires   timestamptz;
+alter table players add column if not exists scan_boost_expires timestamptz;
+alter table players add column if not exists id_hints           int not null default 0;
 
 create table if not exists credit_events (
   id          uuid primary key default uuid_generate_v4(),

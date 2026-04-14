@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable, ScrollView,
-  ActivityIndicator, Modal, TextInput, Alert,
+  ActivityIndicator, Modal, TextInput, Alert, Animated,
 } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/api/client';
 import { router } from 'expo-router';
 import { useCatchStore, type CatchRecord } from '@/stores/catchStore';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -53,12 +55,20 @@ const CATEGORY_LABEL: Record<BadgeCategory, string> = {
   collection: 'COLLECTION',
 };
 
-type GarageTab = 'catches' | 'collection' | 'market';
+type GarageTab = 'catches' | 'collection' | 'market' | 'shop';
 type CatchViewMode = 'grid' | '3d';
+
+const WHOLESALER_PRICES: Record<string, number> = {
+  common:    10,
+  uncommon:  50,
+  rare:      200,
+  epic:      750,
+  legendary: 3_000,
+};
 
 // ─── CatchCard ───────────────────────────────────────────────────────────────
 
-function CatchCard({ item }: { item: CatchRecord }) {
+function CatchCard({ item, onSellPress }: { item: CatchRecord; onSellPress?: (item: CatchRecord) => void }) {
   const rarity = item.rarity ?? (
     item.confidence >= 0.9  ? 'epic'     :
     item.confidence >= 0.8  ? 'rare'     :
@@ -68,12 +78,14 @@ function CatchCard({ item }: { item: CatchRecord }) {
   const accent = RARITY_ACCENT[rarity] ?? RARITY_ACCENT.common;
   const label  = RARITY_LABEL[rarity]  ?? 'COMMON';
   const date   = new Date(item.caughtAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const price  = WHOLESALER_PRICES[rarity] ?? WHOLESALER_PRICES.common;
 
   return (
     <Pressable
       style={[styles.card, { backgroundColor: bg, borderColor: accent + '44' }]}
       onPress={() => item.generationId && router.push(`/vehicle/${item.generationId}`)}
-      disabled={!item.generationId}
+      onLongPress={() => onSellPress?.(item)}
+      delayLongPress={400}
     >
       <View style={styles.cardTop}>
         <View style={[styles.typeBadge, { borderColor: accent + '66' }]}>
@@ -89,7 +101,7 @@ function CatchCard({ item }: { item: CatchRecord }) {
       </View>
       <View style={styles.cardBottom}>
         <Text style={[styles.rarityLabel, { color: accent }]}>{label}</Text>
-        <Text style={styles.dateLabel}>{date}</Text>
+        <Text style={[styles.dateLabel, { color: accent + '88' }]}>{price} CR</Text>
       </View>
       {item.firstFinderAwarded && (
         <View style={[styles.ffBadge, { borderColor: accent }]}>
@@ -461,14 +473,116 @@ function SellTab({ catches }: { catches: CatchRecord[] }) {
   );
 }
 
+// ─── ShopTab ──────────────────────────────────────────────────────────────────
+
+type ShopItem = { id: string; name: string; desc: string; cost: number; icon: string; category: string };
+
+function ShopTab() {
+  const credits          = usePlayerStore(s => s.credits);
+  const applyShopPurchase = usePlayerStore(s => s.applyShopPurchase);
+  const xpBoostExpires   = usePlayerStore(s => s.xpBoostExpires);
+  const scanBoostExpires = usePlayerStore(s => s.scanBoostExpires);
+  const idHints          = usePlayerStore(s => s.idHints);
+
+  const { data: items = [], isLoading } = useQuery<ShopItem[]>({
+    queryKey: ['shop-items'],
+    queryFn:  () => apiClient.get('/shop/items') as Promise<ShopItem[]>,
+    staleTime: Infinity,
+  });
+
+  const buyMutation = useMutation({
+    mutationFn: (itemId: string) =>
+      apiClient.post('/shop/buy', { item_id: itemId }) as Promise<any>,
+    onSuccess(data) {
+      applyShopPurchase({
+        newCredits:       data.new_credits,
+        xpBoostExpires:   data.xp_boost_expires,
+        scanBoostExpires: data.scan_boost_expires,
+        idHints:          data.id_hints,
+      });
+    },
+    onError() {
+      Alert.alert('Purchase failed', 'Not enough credits or item unavailable.');
+    },
+  });
+
+  function isBoostActive(expires: string | null | undefined): boolean {
+    return !!expires && new Date(expires) > new Date();
+  }
+
+  function boostLabel(expires: string | null | undefined): string {
+    if (!expires || new Date(expires) <= new Date()) return '';
+    const mins = Math.max(0, Math.round((new Date(expires).getTime() - Date.now()) / 60000));
+    return ` · ${mins}m left`;
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.shopContainer} showsVerticalScrollIndicator={false}>
+      <Text style={styles.shopBalance}>{credits.toLocaleString()} CR</Text>
+      <Text style={styles.shopBalanceLabel}>AVAILABLE CREDITS</Text>
+
+      {/* Active boosts summary */}
+      {(isBoostActive(xpBoostExpires) || isBoostActive(scanBoostExpires) || idHints > 0) && (
+        <View style={styles.activeBoosts}>
+          <Text style={styles.activeBoostsLabel}>ACTIVE</Text>
+          {isBoostActive(xpBoostExpires) && (
+            <Text style={styles.activeBoostItem}>⚡ XP Boost{boostLabel(xpBoostExpires)}</Text>
+          )}
+          {isBoostActive(scanBoostExpires) && (
+            <Text style={styles.activeBoostItem}>📡 Scan Boost{boostLabel(scanBoostExpires)}</Text>
+          )}
+          {idHints > 0 && (
+            <Text style={styles.activeBoostItem}>🔍 ID Hints × {idHints}</Text>
+          )}
+        </View>
+      )}
+
+      {isLoading ? (
+        <ActivityIndicator color="#e63946" style={{ marginTop: 40 }} />
+      ) : (
+        items.map(item => {
+          const canAfford = credits >= item.cost;
+          const buying    = buyMutation.isPending && buyMutation.variables === item.id;
+          return (
+            <View key={item.id} style={styles.shopItem}>
+              <Text style={styles.shopItemIcon}>{item.icon}</Text>
+              <View style={styles.shopItemBody}>
+                <Text style={styles.shopItemName}>{item.name}</Text>
+                <Text style={styles.shopItemDesc}>{item.desc}</Text>
+              </View>
+              <View style={styles.shopItemRight}>
+                <Text style={styles.shopItemCost}>{item.cost} CR</Text>
+                <Pressable
+                  style={[styles.shopBuyBtn, !canAfford && styles.shopBuyBtnDim]}
+                  onPress={() => buyMutation.mutate(item.id)}
+                  disabled={!canAfford || buyMutation.isPending}
+                >
+                  {buying
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={styles.shopBuyBtnText}>BUY</Text>
+                  }
+                </Pressable>
+              </View>
+            </View>
+          );
+        })
+      )}
+    </ScrollView>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GarageScreen() {
   const catches    = useCatchStore(s => s.catches);
+  const removeCatch = useCatchStore(s => s.removeCatch);
   const syncError  = useCatchStore(s => s.syncError);
   const clearError = useCatchStore(s => s.clearSyncError);
   const credits    = usePlayerStore(s => s.credits);
+  const setCredits = usePlayerStore(s => s.setCredits);
   const [activeTab, setActiveTab] = useState<GarageTab>('catches');
+  const [sellTarget, setSellTarget] = useState<CatchRecord | null>(null);
+  const [selling, setSelling] = useState(false);
   const [catchViewMode, setCatchViewMode] = useState<CatchViewMode>('3d');
 
   const pendingCount = catches.filter(c => !c.synced).length;
@@ -506,7 +620,7 @@ export default function GarageScreen() {
 
       {/* Top tab bar */}
       <View style={styles.tabBar}>
-        {(['catches', 'collection', 'market'] as GarageTab[]).map(tab => (
+        {(['catches', 'collection', 'market', 'shop'] as GarageTab[]).map(tab => (
           <Pressable
             key={tab}
             style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
@@ -551,11 +665,16 @@ export default function GarageScreen() {
                 data={catches}
                 keyExtractor={item => item.id}
                 numColumns={2}
-                renderItem={({ item }) => <CatchCard item={item} />}
+                renderItem={({ item }) => (
+                  <CatchCard item={item} onSellPress={item.synced ? setSellTarget : undefined} />
+                )}
                 contentContainerStyle={styles.grid}
                 columnWrapperStyle={styles.row}
                 showsVerticalScrollIndicator={false}
               />
+            )}
+            {catchViewMode === 'grid' && (
+              <Text style={styles.sellHint}>Long-press any car to sell to wholesaler</Text>
             )}
           </View>
         )
@@ -563,6 +682,71 @@ export default function GarageScreen() {
 
       {activeTab === 'collection' && <CollectionTab catches={catches} />}
       {activeTab === 'market' && <MarketTab mycatches={catches} />}
+      {activeTab === 'shop' && <ShopTab />}
+
+      {/* Sell to Wholesaler modal */}
+      <Modal
+        visible={!!sellTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSellTarget(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setSellTarget(null)}>
+          <View style={styles.sellModal}>
+            {sellTarget && (() => {
+              const rarity = sellTarget.rarity ?? 'common';
+              const accent = RARITY_ACCENT[rarity] ?? '#444';
+              const price  = WHOLESALER_PRICES[rarity] ?? 10;
+              return (
+                <>
+                  <Text style={styles.sellModalTitle}>SELL TO WHOLESALER</Text>
+                  <Text style={styles.sellModalCar}>{sellTarget.make} {sellTarget.model}</Text>
+                  <Text style={[styles.sellModalRarity, { color: accent }]}>
+                    {RARITY_LABEL[rarity]}
+                  </Text>
+                  <Text style={styles.sellModalPrice}>{price.toLocaleString()} CR</Text>
+                  <Text style={styles.sellModalNote}>
+                    This vehicle will be removed from your garage permanently.
+                  </Text>
+                  <View style={styles.sellModalBtns}>
+                    <Pressable
+                      style={styles.sellModalCancel}
+                      onPress={() => setSellTarget(null)}
+                    >
+                      <Text style={styles.sellModalCancelText}>CANCEL</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.sellModalConfirm, selling && { opacity: 0.6 }]}
+                      disabled={selling}
+                      onPress={async () => {
+                        if (!sellTarget) return;
+                        setSelling(true);
+                        try {
+                          const res: any = await apiClient.post('/market/sell', {
+                            catch_id: sellTarget.id,
+                          });
+                          removeCatch(sellTarget.id);
+                          setCredits(res.new_credits);
+                          setSellTarget(null);
+                        } catch {
+                          Alert.alert('Error', 'Could not complete sale. Try again.');
+                        } finally {
+                          setSelling(false);
+                        }
+                      }}
+                    >
+                      {selling
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Text style={styles.sellModalConfirmText}>SELL</Text>
+                      }
+                    </Pressable>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -699,4 +883,36 @@ const styles = StyleSheet.create({
   errorText:       { color: '#e63946', fontSize: 14, textAlign: 'center', marginBottom: 16 },
   retryBtn:        { borderWidth: 1, borderColor: '#333', borderRadius: 8, paddingHorizontal: 20, paddingVertical: 10 },
   retryText:       { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  sellHint:        { color: '#2a2a2a', fontSize: 11, textAlign: 'center', paddingBottom: 12 },
+
+  // Sell to wholesaler modal
+  sellModal:          { width: '100%', backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, gap: 10, borderTopWidth: 1, borderColor: '#1a1a1a' },
+  sellModalTitle:     { color: '#555', fontSize: 10, fontWeight: '800', letterSpacing: 3, textAlign: 'center' },
+  sellModalCar:       { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
+  sellModalRarity:    { fontSize: 12, fontWeight: '800', letterSpacing: 2, textAlign: 'center' },
+  sellModalPrice:     { color: '#fff', fontSize: 36, fontWeight: '900', textAlign: 'center', letterSpacing: 2 },
+  sellModalNote:      { color: '#444', fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: 4 },
+  sellModalBtns:      { flexDirection: 'row', gap: 10, marginTop: 8 },
+  sellModalCancel:    { flex: 1, backgroundColor: '#1a1a1a', borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
+  sellModalCancelText:{ color: '#555', fontSize: 13, fontWeight: '800', letterSpacing: 2 },
+  sellModalConfirm:   { flex: 1, backgroundColor: '#e63946', borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
+  sellModalConfirmText:{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 2 },
+
+  // Shop tab
+  shopContainer:      { padding: 20, paddingBottom: 60, gap: 12 },
+  shopBalance:        { color: '#fff', fontSize: 40, fontWeight: '900', textAlign: 'center', letterSpacing: 2 },
+  shopBalanceLabel:   { color: '#333', fontSize: 10, fontWeight: '800', letterSpacing: 3, textAlign: 'center', marginBottom: 8 },
+  activeBoosts:       { backgroundColor: '#111', borderRadius: 10, padding: 14, gap: 6, borderWidth: 1, borderColor: '#1a1a1a' },
+  activeBoostsLabel:  { color: '#333', fontSize: 9, fontWeight: '800', letterSpacing: 3 },
+  activeBoostItem:    { color: '#22c55e', fontSize: 13, fontWeight: '700' },
+  shopItem:           { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: '#1a1a1a' },
+  shopItemIcon:       { fontSize: 28, width: 36, textAlign: 'center' },
+  shopItemBody:       { flex: 1, gap: 3 },
+  shopItemName:       { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  shopItemDesc:       { color: '#444', fontSize: 11, lineHeight: 15 },
+  shopItemRight:      { alignItems: 'flex-end', gap: 6 },
+  shopItemCost:       { color: '#888', fontSize: 12, fontWeight: '700' },
+  shopBuyBtn:         { backgroundColor: '#e63946', borderRadius: 7, paddingVertical: 7, paddingHorizontal: 14 },
+  shopBuyBtnDim:      { backgroundColor: '#2a2a2a' },
+  shopBuyBtnText:     { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
 });

@@ -179,10 +179,23 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
             "duplicate_reason": dedup_result,   # "hash" | "fuzzy"
         }
 
-    # XP computation
-    boost_result   = get_orbital_boost(db, player_id) if body.catch_type != "space" else None
-    orbital_boost  = boost_result[0] if boost_result else 1.0
+    # XP computation — orbital boost from satellite catch
+    boost_result    = get_orbital_boost(db, player_id) if body.catch_type != "space" else None
+    orbital_boost   = boost_result[0] if boost_result else 1.0
     boost_remaining = boost_result[1] if boost_result else 0
+
+    # Shop XP boost — purchasable 2× multiplier, stacks with orbital boost
+    shop_xp_boost = 1.0
+    if body.catch_type != "space":
+        p_row = db.table("players").select("xp_boost_expires").eq("id", player_id).maybe_single().execute()
+        xp_exp = (p_row.data or {}).get("xp_boost_expires")
+        if xp_exp:
+            from datetime import datetime, timezone
+            exp_dt = datetime.fromisoformat(xp_exp.replace("Z", "+00:00"))
+            if exp_dt > datetime.now(timezone.utc):
+                shop_xp_boost = 2.0
+
+    combined_boost = orbital_boost * shop_xp_boost
 
     xp_earned, xp_reasons = compute_xp(
         catch_type=body.catch_type,
@@ -190,7 +203,7 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
         rarity_tier=_get_rarity(db, body.generation_id),
         is_personal_first=is_personal_first,
         session_same_gen_count=same_gen_count,
-        orbital_boost=orbital_boost,
+        orbital_boost=combined_boost,
     )
     new_total_xp, level_up, new_level = apply_xp(db, player_id, xp_earned, catch_id, xp_reasons)
 

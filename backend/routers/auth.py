@@ -42,6 +42,7 @@ async def signup(body: SignUpRequest):
         db.table("players").upsert({
             "id":       user_id,
             "username": body.username,
+            "credits":  100,          # welcome bonus
         }, on_conflict="id").execute()
     except Exception as e:
         detail = str(e)
@@ -92,15 +93,22 @@ async def me_info(authorization: str = Header(...)):
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    result = db.table("players").select("username, xp, level").eq("id", user_id).single().execute()
+    result = db.table("players") \
+        .select("username, xp, level, credits, xp_boost_expires, scan_boost_expires, id_hints") \
+        .eq("id", user_id).single().execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Player not found")
 
+    d = result.data
     return {
-        "user_id": user_id,
-        "username": result.data["username"],
-        "xp": result.data["xp"],
-        "level": result.data["level"],
+        "user_id":            user_id,
+        "username":           d["username"],
+        "xp":                 d["xp"],
+        "level":              d["level"],
+        "credits":            d.get("credits", 0),
+        "xp_boost_expires":   d.get("xp_boost_expires"),
+        "scan_boost_expires": d.get("scan_boost_expires"),
+        "id_hints":           d.get("id_hints", 0),
     }
 
 

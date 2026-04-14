@@ -131,7 +131,7 @@ function RarityBar({ byRarity, total }: { byRarity: Record<string, number>; tota
 export default function ProfileScreen() {
   const {
     xp, level, username, userId,
-    clearSession, setPlayer, setProfile,
+    clearSession, setPlayer, setFullProfile,
     accessToken, orbitalBoostExpires,
   } = usePlayerStore();
   const { privacyShieldEnabled, togglePrivacyShield, contributeScans, toggleContributeScans } = useSettingsStore();
@@ -183,7 +183,14 @@ export default function ProfileScreen() {
     apiClient.get('/auth/me')
       .then((profile: any) => {
         setPlayer({ userId, username: profile.username, accessToken });
-        setProfile(profile.xp, profile.level);
+        setFullProfile({
+          xp:               profile.xp,
+          level:            profile.level,
+          credits:          profile.credits ?? 0,
+          xpBoostExpires:   profile.xp_boost_expires,
+          scanBoostExpires: profile.scan_boost_expires,
+          idHints:          profile.id_hints ?? 0,
+        });
       })
       .catch(() => {});
   }, [accessToken, userId]));

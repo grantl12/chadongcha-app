@@ -25,6 +25,15 @@ CREDIT_REWARD_PER_CATCH = 10   # credits awarded per catch (applied by catches r
 
 VALID_RARITIES = {"common", "uncommon", "rare", "epic", "legendary"}
 
+# Credits paid by the wholesaler per rarity tier
+WHOLESALER_PRICES = {
+    "common":    10,
+    "uncommon":  50,
+    "rare":      200,
+    "epic":      750,
+    "legendary": 3_000,
+}
+
 
 # ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -392,6 +401,68 @@ async def accept_bid(listing_id: str, body: AcceptBidBody, authorization: str = 
     ]).execute()
 
     return {"ok": True, "sale_price": sale_price}
+
+
+@router.post("/sell")
+async def sell_to_wholesaler(body: dict, authorization: str = Header(...)):
+    """
+    Sell a catch directly to the game (wholesaler).
+    Awards credits based on the vehicle's rarity tier and removes the catch.
+    """
+    db = get_client()
+    player_id = _resolve_player(db, authorization)
+    catch_id  = body.get("catch_id")
+    if not catch_id:
+        raise HTTPException(status_code=400, detail="catch_id required")
+
+    # Verify ownership + load rarity via generations join
+    catch = db.table("catches") \
+        .select("id, player_id, generation_id, generations(rarity_tier)") \
+        .eq("id", catch_id) \
+        .eq("player_id", player_id) \
+        .maybe_single() \
+        .execute()
+    if not catch or not catch.data:
+        raise HTTPException(status_code=404, detail="Catch not found or not yours")
+
+    # Can't sell something that's actively listed
+    active_listing = db.table("market_listings") \
+        .select("id") \
+        .eq("catch_id", catch_id) \
+        .eq("status", "active") \
+        .maybe_single() \
+        .execute()
+    if active_listing and active_listing.data:
+        raise HTTPException(status_code=409, detail="Delist from market before selling to wholesaler")
+
+    gen      = catch.data.get("generations") or {}
+    rarity   = gen.get("rarity_tier", "common") if gen else "common"
+    payout   = WHOLESALER_PRICES.get(rarity, WHOLESALER_PRICES["common"])
+
+    # Award credits
+    db.rpc("increment_credits", {"p_player_id": player_id, "p_amount": payout}).execute()
+
+    # Log credit event
+    db.table("credit_events").insert({
+        "player_id": player_id,
+        "delta":     payout,
+        "reason":    "wholesaler_sale",
+        "ref_id":    catch_id,
+    }).execute()
+
+    # Delete the catch
+    db.table("catches").delete().eq("id", catch_id).execute()
+
+    # Return new credit total
+    player = db.table("players").select("credits").eq("id", player_id).maybe_single().execute()
+    new_total = (player.data or {}).get("credits", 0)
+
+    return {
+        "ok":           True,
+        "credits_paid": payout,
+        "rarity":       rarity,
+        "new_credits":  new_total,
+    }
 
 
 @router.delete("/listings/{listing_id}")

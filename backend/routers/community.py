@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 from db import get_client
-from services.xp_service import apply_xp, get_orbital_boost
+from services.xp_service import apply_xp, compute_xp, get_orbital_boost
 
 router = APIRouter()
 
@@ -218,7 +218,7 @@ async def suggest_id(body: SuggestBody, authorization: str = Header(...)):
 
     # Upsert — player can revise their suggestion
     try:
-        res = db.table("id_suggestions").upsert({
+        db.table("id_suggestions").upsert({
             "unknown_catch_id": body.unknown_catch_id,
             "player_id":        player_id,
             "generation_id":    generation_id,

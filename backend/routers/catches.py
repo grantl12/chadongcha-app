@@ -215,7 +215,6 @@ async def ingest_catch(
         p_row = db.table("players").select("xp_boost_expires").eq("id", player_id).maybe_single().execute()
         xp_exp = (p_row.data or {}).get("xp_boost_expires")
         if xp_exp:
-            from datetime import datetime, timezone
             exp_dt = datetime.fromisoformat(xp_exp.replace("Z", "+00:00"))
             if exp_dt > datetime.now(timezone.utc):
                 shop_xp_boost = 2.0

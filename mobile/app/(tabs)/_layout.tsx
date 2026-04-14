@@ -51,7 +51,7 @@ export default function TabsLayout() {
           tabBarInactiveTintColor: '#555',
         }}
       >
-        <Tabs.Screen name="index"   options={{ title: 'Radar',   tabBarIcon: ({ color, size }) => <Ionicons name="radio-outline"       size={size} color={color} /> }} />
+        <Tabs.Screen name="index"   options={{ title: 'Ops',      tabBarIcon: ({ color, size }) => <Ionicons name="radio-outline"       size={size} color={color} /> }} />
         <Tabs.Screen name="garage"  options={{ title: 'Garage',  tabBarIcon: ({ color, size }) => <Ionicons name="car-sport-outline"    size={size} color={color} /> }} />
         <Tabs.Screen name="map"     options={{ title: 'Roads',   tabBarIcon: ({ color, size }) => <Ionicons name="map-outline"          size={size} color={color} /> }} />
         <Tabs.Screen name="feed"    options={{ title: 'Feed',    tabBarIcon: ({ color, size }) => <Ionicons name="pulse-outline"        size={size} color={color} /> }} />

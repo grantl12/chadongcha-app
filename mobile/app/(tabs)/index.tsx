@@ -96,7 +96,7 @@ function OrbitalBoostBanner({ expires }: { expires: string | null }) {
   );
 }
 
-export default function RadarScreen() {
+export default function OperationsScreen() {
   const { latitude, longitude } = useLocation();
   const addCatch = useCatchStore(s => s.addCatch);
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
@@ -135,7 +135,7 @@ export default function RadarScreen() {
 
       {/* Mode entry buttons */}
       <View style={styles.modeSection}>
-        <Text style={styles.title}>RADAR</Text>
+        <Text style={styles.title}>OPERATIONS</Text>
         <Text style={styles.subtitle}>Vehicle hunting · Space objects overhead</Text>
 
         <Pressable style={styles.primaryButton} onPress={() => router.push('/highway')}>
@@ -146,6 +146,11 @@ export default function RadarScreen() {
         <Pressable style={styles.secondaryButton} onPress={() => router.push('/scan360')}>
           <Text style={styles.buttonText}>360° SCAN</Text>
           <Text style={styles.buttonSub}>Active parked vehicle scan</Text>
+        </Pressable>
+
+        <Pressable style={styles.identifyButton} onPress={() => router.push('/identify')}>
+          <Text style={styles.buttonText}>IDENTIFY</Text>
+          <Text style={styles.buttonSub}>Guess mystery cars · earn XP</Text>
         </Pressable>
       </View>
 
@@ -203,6 +208,7 @@ const styles = StyleSheet.create({
   subtitle:         { color: '#444', fontSize: 12, marginBottom: 8 },
   primaryButton:    { backgroundColor: '#e63946', borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24 },
   secondaryButton:  { backgroundColor: '#141414', borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24, borderWidth: 1, borderColor: '#222' },
+  identifyButton:   { backgroundColor: '#141414', borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24, borderWidth: 1, borderColor: '#e6394633' },
   buttonText:       { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 2 },
   buttonSub:        { color: '#ffffff66', fontSize: 12, marginTop: 3 },
 

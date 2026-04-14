@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChaDongCha — Vehicle Hunting Game</title>
+  <meta name="description" content="ChaDongCha is a mobile game where you catch, identify, and collect real vehicles spotted in the wild. Scan cars, claim road territory, and compete globally." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:   #e63946;
+      --dark:  #0a0a0a;
+      --card:  #111111;
+      --muted: #444444;
+      --text:  #ffffff;
+      --sub:   #888888;
+    }
+
+    body {
+      background: var(--dark);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+    }
+
+    /* ── Nav ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 40px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .logo span { color: var(--red); }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+    nav a:hover { color: var(--text); }
+
+    /* ── Hero ── */
+    .hero {
+      max-width: 760px;
+      margin: 100px auto 80px;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .hero-eyebrow {
+      display: inline-block;
+      background: #1a0a0a;
+      border: 1px solid #3a1a1a;
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      margin-bottom: 28px;
+    }
+    h1 {
+      font-size: clamp(36px, 7vw, 72px);
+      font-weight: 900;
+      letter-spacing: 6px;
+      line-height: 1.05;
+      margin-bottom: 24px;
+    }
+    h1 .accent { color: var(--red); }
+    .hero p {
+      font-size: 18px;
+      color: var(--sub);
+      max-width: 540px;
+      margin: 0 auto 40px;
+    }
+    .btn {
+      display: inline-block;
+      background: var(--red);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 2px;
+      padding: 14px 32px;
+      border-radius: 8px;
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid #2a2a2a;
+      color: var(--sub);
+      margin-left: 12px;
+    }
+    .btn-ghost:hover { border-color: #444; color: var(--text); }
+
+    /* ── Divider ── */
+    .divider {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      margin: 80px auto;
+      max-width: 900px;
+    }
+
+    /* ── Features ── */
+    .features {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--card);
+      border: 1px solid #1a1a1a;
+      border-radius: 12px;
+      padding: 28px 24px;
+    }
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 14px;
+      display: block;
+    }
+    .feature-card h3 {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .feature-card p {
+      font-size: 13px;
+      color: var(--sub);
+      line-height: 1.55;
+    }
+
+    /* ── API Notice ── */
+    .api-section {
+      max-width: 680px;
+      margin: 80px auto;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .api-section h2 {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+    }
+    .api-section p {
+      font-size: 14px;
+      color: var(--sub);
+      margin-bottom: 12px;
+    }
+    .api-box {
+      background: var(--card);
+      border: 1px solid #1a1a1a;
+      border-radius: 10px;
+      padding: 24px;
+      text-align: left;
+      margin-top: 24px;
+    }
+    .api-box h4 {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .api-box ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .api-box li {
+      font-size: 13px;
+      color: var(--sub);
+      padding-left: 18px;
+      position: relative;
+    }
+    .api-box li::before {
+      content: "–";
+      position: absolute;
+      left: 0;
+      color: var(--red);
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid #1a1a1a;
+      padding: 32px 40px;
+      margin-top: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    footer p {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    footer a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+    }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; gap: 20px; }
+
+    @media (max-width: 600px) {
+      nav { padding: 16px 20px; }
+      footer { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a class="logo" href="/">CHA<span>동</span>CHA</a>
+    <a href="privacy.html">Privacy Policy</a>
+  </nav>
+
+  <section class="hero">
+    <span class="hero-eyebrow">AVAILABLE ON IOS &amp; ANDROID</span>
+    <h1>CATCH EVERY<br><span class="accent">VEHICLE</span><br>ON THE ROAD</h1>
+    <p>
+      ChaDongCha is a location-based mobile game where you identify and collect
+      real vehicles spotted in the wild — on your daily commute, road trips, or
+      right outside your window.
+    </p>
+    <a class="btn" href="#">COMING SOON</a>
+    <a class="btn btn-ghost" href="privacy.html">Privacy Policy</a>
+  </section>
+
+  <hr class="divider" />
+
+  <section class="features">
+    <div class="feature-card">
+      <span class="feature-icon">📷</span>
+      <h3>SCAN &amp; CATCH</h3>
+      <p>Point your camera at any vehicle. On-device AI identifies the make, model, and generation in real time — no internet required.</p>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">🗺</span>
+      <h3>CLAIM TERRITORY</h3>
+      <p>Every road you scan on becomes a Road Segment you can own. Scan it more than anyone else in the last 30 days and you're Road King.</p>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">🏆</span>
+      <h3>COLLECT &amp; COMPETE</h3>
+      <p>Build a garage of rare finds, earn badges for epic catches, and climb the global leaderboard. Legendaries don't come easy.</p>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">🛸</span>
+      <h3>SPACE MODE</h3>
+      <p>Catch the ISS and other satellites as they pass overhead. Space catches activate an Orbital Boost that multiplies XP on all vehicle catches.</p>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">🤝</span>
+      <h3>COMMUNITY ID</h3>
+      <p>Can't identify a vehicle? Submit it to the community. Players vote on the make and model — correct IDs earn XP for everyone involved.</p>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">🔭</span>
+      <h3>SPOT FROM HOME</h3>
+      <p>When you can't be out on the road, browse community-submitted mystery vehicles and help identify them from photos.</p>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section class="api-section">
+    <h2>REDDIT API USE</h2>
+    <p>
+      ChaDongCha uses the Reddit API in read-only mode to power its community
+      identification feature. We surface publicly posted photos from
+      r/whatisthiscar as a guessing mechanic for players.
+    </p>
+    <p>
+      We do not collect Reddit account data, store credentials, or post on
+      behalf of users. All Reddit content shown in the app includes attribution
+      to the original poster.
+    </p>
+    <div class="api-box">
+      <h4>HOW WE USE THE API</h4>
+      <ul>
+        <li>Read public posts and top comments from r/whatisthiscar (read-only)</li>
+        <li>Display post images in-app with attribution to the Reddit OP</li>
+        <li>Use top-voted comments as answer data for the identification mechanic</li>
+        <li>No user login, no OAuth, no writes to Reddit</li>
+        <li>Rate-limited to well within Reddit API guidelines</li>
+      </ul>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <footer>
+    <p>&copy; 2025 ChaDongCha. All rights reserved.</p>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="mailto:contact@chadongcha.app">Contact</a>
+    </div>
+  </footer>
+
+</body>
+</html>

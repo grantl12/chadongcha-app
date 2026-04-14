@@ -11,7 +11,7 @@ export type Badge = {
   id: string;
   name: string;
   description: string;
-  category: 'enthusiast' | 'collection' | 'rarity' | 'decade' | 'style';
+  category: 'enthusiast' | 'collection' | 'rarity' | 'decade' | 'style' | 'grind' | 'social';
   icon: string;                 // emoji
   color: string;                // accent color for the badge card
   earned: boolean;
@@ -22,6 +22,20 @@ type BadgeDef = Omit<Badge, 'earned' | 'progress'> & {
   check: (catches: CatchRecord[]) => boolean;
   trackProgress?: (catches: CatchRecord[]) => { current: number; total: number };
 };
+
+// ─── Additional helpers ──────────────────────────────────────────────────────
+
+function catchCount(n: number) {
+  return (catches: CatchRecord[]) => catches.length >= n;
+}
+
+function catchCountProgress(n: number) {
+  return (catches: CatchRecord[]) => ({ current: Math.min(catches.length, n), total: n });
+}
+
+function hasCatchType(type: CatchRecord['catchType']) {
+  return (catches: CatchRecord[]) => catches.some(c => c.catchType === type);
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -469,6 +483,394 @@ const BADGE_DEFS: BadgeDef[] = [
       return y !== null && y >= 2020;
     }),
   },
+
+  // ── Decade expansion ─────────────────────────────────────────────────────
+
+  {
+    id: 'muscle_era',
+    name: 'Muscle Era',
+    description: 'Catch a vehicle from a 1960s or 1970s generation.',
+    category: 'decade',
+    icon: '🎸',
+    color: '#bf360c',
+    check: c => c.some(x => {
+      const y = genYear(x.generation);
+      return y !== null && y >= 1960 && y <= 1979;
+    }),
+  },
+  {
+    id: 'malaise_survivor',
+    name: 'Malaise Era Survivor',
+    description: 'Catch a vehicle from a 1975–1982 generation.',
+    category: 'decade',
+    icon: '📻',
+    color: '#6d4c41',
+    check: c => c.some(x => {
+      const y = genYear(x.generation);
+      return y !== null && y >= 1975 && y <= 1982;
+    }),
+  },
+
+  // ── Grind tier ───────────────────────────────────────────────────────────
+
+  {
+    id: 'ten_deep',
+    name: 'Ten Deep',
+    description: 'Catch 10 vehicles.',
+    category: 'grind',
+    icon: '🔟',
+    color: '#37474f',
+    check: catchCount(10),
+    trackProgress: catchCountProgress(10),
+  },
+  {
+    id: 'century_club',
+    name: 'Century Club',
+    description: 'Catch 100 vehicles.',
+    category: 'grind',
+    icon: '💯',
+    color: '#f57f17',
+    check: catchCount(100),
+    trackProgress: catchCountProgress(100),
+  },
+  {
+    id: 'road_warrior',
+    name: 'Road Warrior',
+    description: 'Catch 500 vehicles. True prestige.',
+    category: 'grind',
+    icon: '🛣️',
+    color: '#b71c1c',
+    check: catchCount(500),
+    trackProgress: catchCountProgress(500),
+  },
+  {
+    id: 'import_tuner',
+    name: 'Import Tuner',
+    description: 'Catch a WRX, Civic Type R, Golf GTI, and GR86.',
+    category: 'grind',
+    icon: '🔧',
+    color: '#1a237e',
+    check: c =>
+      hasModel('Subaru', 'WRX')(c) &&
+      hasModel('Honda', 'Civic')(c) &&
+      hasModel('Volkswagen', 'Golf')(c) &&
+      hasModel('Toyota', 'GR86')(c),
+  },
+  {
+    id: 'domestic_muscle',
+    name: 'Domestic Muscle',
+    description: 'Catch a Mustang, Challenger, Charger, and Corvette.',
+    category: 'grind',
+    icon: '💪',
+    color: '#c62828',
+    check: c =>
+      hasModel('Ford', 'Mustang')(c) &&
+      hasModel('Dodge', 'Challenger')(c) &&
+      hasModel('Dodge', 'Charger')(c) &&
+      hasModel('Chevrolet', 'Corvette')(c),
+  },
+  {
+    id: 'holy_trinity',
+    name: 'Holy Trinity',
+    description: 'Catch a Porsche 911, a Ferrari, and a Lamborghini.',
+    category: 'grind',
+    icon: '✝️',
+    color: '#880e4f',
+    check: c =>
+      hasModel('Porsche', '911')(c) &&
+      c.some(byMake('Ferrari')) &&
+      c.some(byMake('Lamborghini')),
+  },
+  {
+    id: 'all_american_sweep',
+    name: 'All-American Sweep',
+    description: 'Catch vehicles from all 5 domestic brands: Ford, Chevy, Ram, GMC, and Dodge.',
+    category: 'grind',
+    icon: '🇺🇸',
+    color: '#b22234',
+    check: hasMakes(['Ford', 'Chevrolet', 'Ram', 'GMC', 'Dodge']),
+  },
+  {
+    id: 'unplugged',
+    name: 'Unplugged',
+    description: 'Catch all 5 Tesla models: Model 3, Y, S, X, and Cybertruck.',
+    category: 'grind',
+    icon: '🔋',
+    color: '#cc0000',
+    check: c =>
+      hasModel('Tesla', 'Model 3')(c) &&
+      hasModel('Tesla', 'Model Y')(c) &&
+      hasModel('Tesla', 'Model S')(c) &&
+      hasModel('Tesla', 'Model X')(c) &&
+      hasModel('Tesla', 'Cybertruck')(c),
+    trackProgress: c => {
+      const models = ['Model 3', 'Model Y', 'Model S', 'Model X', 'Cybertruck'];
+      const caught = models.filter(m => hasModel('Tesla', m)(c));
+      return { current: caught.length, total: 5 };
+    },
+  },
+
+  // ── Enthusiast deep-cuts ──────────────────────────────────────────────────
+
+  {
+    id: 'g_wagon_gang',
+    name: 'G-Wagon Gang',
+    description: 'Catch a Mercedes-Benz G-Class.',
+    category: 'enthusiast',
+    icon: '🧱',
+    color: '#263238',
+    check: hasModel('Mercedes-Benz', 'G-Class'),
+  },
+  {
+    id: 'blackwing_brotherhood',
+    name: 'Blackwing Brotherhood',
+    description: 'Catch a Cadillac CT5-V Blackwing.',
+    category: 'enthusiast',
+    icon: '🖤',
+    color: '#1a1a2e',
+    check: hasModel('Cadillac', 'CT5'),
+  },
+  {
+    id: 'nsx_spotter',
+    name: 'NSX Spotter',
+    description: 'Catch an Acura NSX. Last of its kind.',
+    category: 'enthusiast',
+    icon: '👁️',
+    color: '#c62828',
+    check: hasModel('Acura', 'NSX'),
+  },
+  {
+    id: 'godzilla_returns',
+    name: 'Godzilla Returns',
+    description: 'Catch a Nissan GT-R, a 370Z, and a 400Z.',
+    category: 'enthusiast',
+    icon: '🦕',
+    color: '#880e4f',
+    check: c =>
+      hasModel('Nissan', 'GT-R')(c) &&
+      (hasModel('Nissan', '370Z')(c) || hasModel('Nissan', '400Z')(c)),
+  },
+  {
+    id: 'hachi_roku',
+    name: 'Hachi-Roku',
+    description: 'Catch a Toyota GR86 or Subaru BRZ.',
+    category: 'enthusiast',
+    icon: '8️⃣6️⃣',
+    color: '#c62828',
+    check: c => hasModel('Toyota', 'GR86')(c) || hasModel('Subaru', 'BRZ')(c),
+  },
+  {
+    id: 'land_cruiser_legacy',
+    name: 'Land Cruiser Legacy',
+    description: 'Catch a Toyota Land Cruiser.',
+    category: 'enthusiast',
+    icon: '🏜️',
+    color: '#795548',
+    check: hasModel('Toyota', 'Land Cruiser'),
+  },
+  {
+    id: 'hellcat_heard',
+    name: 'Hellcat Heard',
+    description: 'Catch a Dodge Charger or Challenger Hellcat variant.',
+    category: 'enthusiast',
+    icon: '😈',
+    color: '#ff6f00',
+    check: c =>
+      hasModel('Dodge', 'Charger')(c) || hasModel('Dodge', 'Challenger')(c),
+  },
+  {
+    id: 'amg_spotter',
+    name: 'AMG Spotter',
+    description: 'Catch a Mercedes-AMG model.',
+    category: 'enthusiast',
+    icon: '⚡',
+    color: '#1b1b1b',
+    check: hasModel('Mercedes-Benz', 'AMG'),
+  },
+  {
+    id: 'm_badge',
+    name: 'M Badge',
+    description: 'Catch a BMW M-series vehicle.',
+    category: 'enthusiast',
+    icon: '🔵',
+    color: '#0d47a1',
+    check: hasModel('BMW', 'M'),
+  },
+  {
+    id: 'rs_spec',
+    name: 'RS Spec',
+    description: 'Catch an Audi RS model.',
+    category: 'enthusiast',
+    icon: '💿',
+    color: '#c62828',
+    check: hasModel('Audi', 'RS'),
+  },
+  {
+    id: 'srt_certified',
+    name: 'SRT Certified',
+    description: 'Catch a Dodge SRT model.',
+    category: 'enthusiast',
+    icon: '🐍',
+    color: '#ff6f00',
+    check: hasModel('Dodge', 'SRT'),
+  },
+  {
+    id: 'raptor_sighting',
+    name: 'Raptor Sighting',
+    description: 'Catch a Ford F-150 Raptor.',
+    category: 'enthusiast',
+    icon: '🦅',
+    color: '#1565c0',
+    check: hasModel('Ford', 'Raptor'),
+  },
+
+  // ── Style expansion ───────────────────────────────────────────────────────
+
+  {
+    id: 'van_life',
+    name: 'Van Life',
+    description: 'Catch 3+ vans or minivans.',
+    category: 'style',
+    icon: '🚐',
+    color: '#4a148c',
+    check: c => c.filter(x => x.bodyStyle.toLowerCase().includes('van')).length >= 3,
+    trackProgress: c => ({
+      current: Math.min(c.filter(x => x.bodyStyle.toLowerCase().includes('van')).length, 3),
+      total: 3,
+    }),
+  },
+  {
+    id: 'hatch_nation',
+    name: 'Hatch Nation',
+    description: 'Catch 5+ hatchbacks.',
+    category: 'style',
+    icon: '🚗',
+    color: '#00695c',
+    check: c => c.filter(x => x.bodyStyle.toLowerCase() === 'hatchback').length >= 5,
+    trackProgress: c => ({
+      current: Math.min(c.filter(x => x.bodyStyle.toLowerCase() === 'hatchback').length, 5),
+      total: 5,
+    }),
+  },
+  {
+    id: 'sedan_society',
+    name: 'Sedan Society',
+    description: 'Catch 10+ sedans.',
+    category: 'style',
+    icon: '🚘',
+    color: '#263238',
+    check: c => c.filter(x => x.bodyStyle.toLowerCase() === 'sedan').length >= 10,
+    trackProgress: c => ({
+      current: Math.min(c.filter(x => x.bodyStyle.toLowerCase() === 'sedan').length, 10),
+      total: 10,
+    }),
+  },
+  {
+    id: 'suv_nation',
+    name: 'SUV Nation',
+    description: 'Catch 10+ SUVs.',
+    category: 'style',
+    icon: '🚙',
+    color: '#37474f',
+    check: c => c.filter(x => x.bodyStyle.toLowerCase() === 'suv').length >= 10,
+    trackProgress: c => ({
+      current: Math.min(c.filter(x => x.bodyStyle.toLowerCase() === 'suv').length, 10),
+      total: 10,
+    }),
+  },
+
+  // ── Social badges (requires backend data) ────────────────────────────────
+
+  {
+    id: 'space_catcher',
+    name: 'Space Catcher',
+    description: 'Catch your first space object.',
+    category: 'social',
+    icon: '🛸',
+    color: '#1a237e',
+    check: hasCatchType('space'),
+  },
+  {
+    id: 'ground_control',
+    name: 'Ground Control',
+    description: 'Catch 5 space objects.',
+    category: 'social',
+    icon: '🌌',
+    color: '#0d47a1',
+    check: c => c.filter(x => x.catchType === 'space').length >= 5,
+    trackProgress: c => ({
+      current: Math.min(c.filter(x => x.catchType === 'space').length, 5),
+      total: 5,
+    }),
+  },
+  {
+    id: 'scanner_pro',
+    name: 'Scanner Pro',
+    description: 'Complete 10 full 360° scans.',
+    category: 'social',
+    icon: '🔄',
+    color: '#1b5e20',
+    check: c => c.filter(x => x.catchType === 'scan360').length >= 10,
+    trackProgress: c => ({
+      current: Math.min(c.filter(x => x.catchType === 'scan360').length, 10),
+      total: 10,
+    }),
+  },
+  {
+    id: 'highway_hunter',
+    name: 'Highway Hunter',
+    description: 'Record 50 Dash Sentry catches.',
+    category: 'social',
+    icon: '🛣️',
+    color: '#b71c1c',
+    check: c => c.filter(x => x.catchType === 'highway').length >= 50,
+    trackProgress: c => ({
+      current: Math.min(c.filter(x => x.catchType === 'highway').length, 50),
+      total: 50,
+    }),
+  },
+  {
+    id: 'community_helper',
+    name: 'Community Helper',
+    description: 'Submit a vehicle to the unknown queue.',
+    category: 'social',
+    icon: '🤝',
+    color: '#00695c',
+    check: c => c.some(x => x.catchType === 'unknown'),
+  },
+
+  // ── Rarity expansion ──────────────────────────────────────────────────────
+
+  {
+    id: 'double_rare',
+    name: 'Double Rare',
+    description: 'Catch 5 rare vehicles.',
+    category: 'rarity',
+    icon: '💠',
+    color: '#6a1b9a',
+    check: c => c.filter(x => x.rarity === 'rare').length >= 5,
+    trackProgress: c => ({ current: Math.min(c.filter(x => x.rarity === 'rare').length, 5), total: 5 }),
+  },
+  {
+    id: 'epic_collection',
+    name: 'Epic Collection',
+    description: 'Catch 10 epic vehicles.',
+    category: 'rarity',
+    icon: '🔮',
+    color: '#e65100',
+    check: c => c.filter(x => x.rarity === 'epic').length >= 10,
+    trackProgress: c => ({ current: Math.min(c.filter(x => x.rarity === 'epic').length, 10), total: 10 }),
+  },
+  {
+    id: 'legendary_status',
+    name: 'Legendary Status',
+    description: 'Catch 3 legendary vehicles.',
+    category: 'rarity',
+    icon: '👑',
+    color: '#e63946',
+    check: c => c.filter(x => x.rarity === 'legendary').length >= 3,
+    trackProgress: c => ({ current: Math.min(c.filter(x => x.rarity === 'legendary').length, 3), total: 3 }),
+  },
 ];
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -492,5 +894,5 @@ export function earnedBadges(catches: CatchRecord[]): Badge[] {
   return computeBadges(catches).filter(b => b.earned);
 }
 
-export const BADGE_CATEGORIES = ['enthusiast', 'collection', 'rarity', 'decade', 'style'] as const;
+export const BADGE_CATEGORIES = ['enthusiast', 'grind', 'rarity', 'style', 'decade', 'social', 'collection'] as const;
 export type BadgeCategory = typeof BADGE_CATEGORIES[number];

@@ -7,7 +7,6 @@ import { useLocation } from '@/hooks/useLocation';
 import { useCatchStore } from '@/stores/catchStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { PrivacyShield } from '@/components/PrivacyShield';
 import {
   VehicleClassifier,
   VehicleClassifierStub,
@@ -55,7 +54,7 @@ export default function DashSentry() {
   const { addCatch } = useCatchStore();
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostActive = boostRemainingMin(orbitalBoostExpires) > 0;
-  const privacyShieldEnabled = useSettingsStore(s => s.privacyShieldEnabled);
+
 
   const [safetyConfirmed, setSafetyConfirmed] = useState(false);
   const [catchBanner, setCatchBanner] = useState<string | null>(null);
@@ -137,8 +136,6 @@ export default function DashSentry() {
         <View style={styles.safetyBanner}>
           <Text style={styles.safetyText}>KEEP EYES ON ROAD</Text>
         </View>
-
-        <PrivacyShield enabled={privacyShieldEnabled} />
 
         {boostActive && (
           <View style={styles.boostPill}>

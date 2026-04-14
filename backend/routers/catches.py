@@ -32,6 +32,11 @@ SCAN360_MIN_GAP_MINUTES         = 3
 # Catches beyond these thresholds still record + contribute to road king.
 SESSION_WINDOW_HOURS            = 24
 
+# Server-side minimum confidence gate.
+# Client thresholds are already 0.65–0.80, but the server enforces a floor
+# to reject replayed or spoofed requests that bypass client validation.
+MIN_CATCH_CONFIDENCE            = 0.55
+
 router = APIRouter()
 
 
@@ -104,6 +109,10 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    # Server-side confidence gate — reject low-confidence catches that bypass client
+    if body.confidence is not None and body.catch_type != "space" and body.confidence < MIN_CATCH_CONFIDENCE:
+        raise HTTPException(status_code=422, detail=f"Confidence too low: {body.confidence:.2f} < {MIN_CATCH_CONFIDENCE}")
+
     # Two-tier dedup check
     dedup_result = _check_dedup(
         db, player_id,
@@ -154,13 +163,18 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     # Short-circuit XP + territory + first-finder for duplicates.
     # Catch is still recorded — it's a real sighting — just no reward.
     if is_duplicate:
+        player_xp = _get_player_xp(db, player_id)
+        player_level = _get_player_level(db, player_id)
         return {
             "catch_id": catch_id,
             "xp_earned": 0,
-            "new_total_xp": _get_player_xp(db, player_id),
+            "new_total_xp": player_xp,
+            "new_level": player_level,
             "level_up": False,
             "road_king_claimed": False,
             "first_finder_awarded": None,
+            "orbital_boost_active": False,
+            "orbital_boost_remaining_min": 0,
             "duplicate": True,
             "duplicate_reason": dedup_result,   # "hash" | "fuzzy"
         }
@@ -333,6 +347,11 @@ def _check_dedup(
 def _get_player_xp(db, player_id: str) -> int:
     result = db.table("players").select("xp").eq("id", player_id).single().execute()
     return result.data["xp"] if result.data else 0
+
+
+def _get_player_level(db, player_id: str) -> int:
+    result = db.table("players").select("level").eq("id", player_id).single().execute()
+    return result.data["level"] if result.data else 1
 
 
 def _get_rarity(db, generation_id: Optional[str]) -> Optional[str]:

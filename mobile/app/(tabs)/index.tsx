@@ -153,11 +153,21 @@ export default function RadarScreen() {
       <View style={styles.satSection}>
         <View style={styles.satHeader}>
           <Text style={styles.satTitle}>OVERHEAD NOW</Text>
-          {satQuery.isLoading && <ActivityIndicator size="small" color="#e63946" />}
+          <View style={[styles.statusPill, satQuery.isLoading ? styles.statusSyncing : satQuery.isError ? styles.statusError : styles.statusOnline]}>
+            <View style={[styles.statusDot, satQuery.isLoading ? styles.statusDotSyncing : satQuery.isError ? styles.statusDotError : styles.statusDotOnline]} />
+            <Text style={styles.statusText}>
+              {satQuery.isLoading ? 'SYNCING' : satQuery.isError ? 'OFFLINE' : 'ONLINE'}
+            </Text>
+          </View>
         </View>
 
         {!latitude ? (
           <Text style={styles.satHint}>Enable location for satellite tracking.</Text>
+        ) : satQuery.isLoading ? (
+          <View style={styles.satLoadingRow}>
+            <ActivityIndicator size="small" color="#e63946" />
+            <Text style={styles.satLoadingText}>Computing orbital passes…</Text>
+          </View>
         ) : satQuery.isError ? (
           <Text style={styles.satHint}>Could not load satellite data.</Text>
         ) : satellites.length === 0 ? (
@@ -200,6 +210,17 @@ const styles = StyleSheet.create({
   satHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   satTitle:         { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 3 },
   satHint:          { color: '#333', fontSize: 13 },
+  statusPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
+  statusOnline:     { backgroundColor: '#0a1a0a', borderColor: '#1a3a1a' },
+  statusSyncing:    { backgroundColor: '#1a0a00', borderColor: '#3a1a00' },
+  statusError:      { backgroundColor: '#1a0a0a', borderColor: '#3a1a1a' },
+  statusDot:        { width: 5, height: 5, borderRadius: 3 },
+  statusDotOnline:  { backgroundColor: '#22c55e' },
+  statusDotSyncing: { backgroundColor: '#f59e0b' },
+  statusDotError:   { backgroundColor: '#e63946' },
+  statusText:       { color: '#555', fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+  satLoadingRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  satLoadingText:   { color: '#333', fontSize: 13 },
   satRow:           { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111' },
   satDot:           { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
   satBody:          { flex: 1, gap: 3 },

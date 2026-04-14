@@ -157,6 +157,20 @@ export default function MapScreen() {
         </MapView>
       )}
 
+      {/* Recenter button */}
+      {latitude && longitude && (
+        <Pressable
+          style={styles.recenterBtn}
+          onPress={() => camera.current?.setCamera({
+            centerCoordinate: [longitude, latitude],
+            zoomLevel: 14,
+            animationDuration: 600,
+          })}
+        >
+          <Text style={styles.recenterIcon}>⊕</Text>
+        </Pressable>
+      )}
+
       {/* Loading indicator */}
       {isLoading && (
         <View style={styles.loadingBadge}>
@@ -245,6 +259,8 @@ const styles = StyleSheet.create({
   map:                   { flex: 1 },
   center:                { flex: 1, alignItems: 'center', justifyContent: 'center' },
   errorText:             { color: '#555', fontSize: 14 },
+  recenterBtn:           { position: 'absolute', bottom: 140, right: 16, width: 44, height: 44, borderRadius: 22, backgroundColor: '#0f0f0f', borderWidth: 1, borderColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center' },
+  recenterIcon:          { color: '#e63946', fontSize: 22, lineHeight: 24 },
   loadingBadge:          { position: 'absolute', top: 60, alignSelf: 'center', backgroundColor: '#0a0a0acc', borderRadius: 20, padding: 10 },
   emptyOverlay:          { position: 'absolute', bottom: 120, left: 24, right: 24, backgroundColor: '#0a0a0acc', borderRadius: 12, padding: 20, alignItems: 'center', gap: 6 },
   emptyTitle:            { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 3 },

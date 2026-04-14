@@ -45,10 +45,12 @@ const CATCH_TYPE_LABEL: Record<string, string> = {
 
 const CATEGORY_LABEL: Record<BadgeCategory, string> = {
   enthusiast: 'ENTHUSIAST',
-  collection: 'COLLECTION',
+  grind:      'GRIND',
   rarity:     'RARITY',
-  decade:     'DECADE',
   style:      'STYLE',
+  decade:     'DECADE',
+  social:     'SOCIAL',
+  collection: 'COLLECTION',
 };
 
 type GarageTab = 'catches' | 'collection' | 'market';
@@ -142,7 +144,7 @@ function BadgeCard({ badge }: { badge: Badge }) {
 function CollectionTab({ catches }: { catches: CatchRecord[] }) {
   const badges = useMemo(() => computeBadges(catches), [catches]);
   const earned = badges.filter(b => b.earned).length;
-  const categories = ['enthusiast', 'rarity', 'collection', 'style', 'decade'] as BadgeCategory[];
+  const categories = ['enthusiast', 'grind', 'rarity', 'style', 'decade', 'social', 'collection'] as BadgeCategory[];
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.collectionContainer} showsVerticalScrollIndicator={false}>
@@ -462,15 +464,34 @@ function SellTab({ catches }: { catches: CatchRecord[] }) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GarageScreen() {
-  const catches = useCatchStore(s => s.catches);
-  const credits = usePlayerStore(s => s.credits);
+  const catches    = useCatchStore(s => s.catches);
+  const syncError  = useCatchStore(s => s.syncError);
+  const clearError = useCatchStore(s => s.clearSyncError);
+  const credits    = usePlayerStore(s => s.credits);
   const [activeTab, setActiveTab] = useState<GarageTab>('catches');
   const [catchViewMode, setCatchViewMode] = useState<CatchViewMode>('3d');
 
-  const earnedCount = useMemo(() => computeBadges(catches).filter(b => b.earned).length, [catches]);
+  const pendingCount = catches.filter(c => !c.synced).length;
+  const earnedCount  = useMemo(() => computeBadges(catches).filter(b => b.earned).length, [catches]);
 
   return (
     <View style={styles.container}>
+      {/* Sync error banner */}
+      {syncError && (
+        <Pressable style={styles.syncErrorBanner} onPress={clearError}>
+          <Text style={styles.syncErrorText}>⚠ Sync failed — catches will retry when online</Text>
+          <Text style={styles.syncErrorDismiss}>✕</Text>
+        </Pressable>
+      )}
+
+      {/* Pending sync indicator */}
+      {!syncError && pendingCount > 0 && (
+        <View style={styles.syncPendingBanner}>
+          <ActivityIndicator size="small" color="#555" style={{ marginRight: 8 }} />
+          <Text style={styles.syncPendingText}>Syncing {pendingCount} catch{pendingCount > 1 ? 'es' : ''}…</Text>
+        </View>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>GARAGE</Text>
@@ -549,7 +570,12 @@ export default function GarageScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#0a0a0a' },
+  container:          { flex: 1, backgroundColor: '#0a0a0a' },
+  syncErrorBanner:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2a0a0a', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e6394633' },
+  syncErrorText:      { color: '#e63946', fontSize: 12, fontWeight: '700', flex: 1 },
+  syncErrorDismiss:   { color: '#e63946', fontSize: 14, marginLeft: 12 },
+  syncPendingBanner:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#141414', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  syncPendingText:    { color: '#444', fontSize: 12 },
 
   // Header
   header:          { paddingHorizontal: 16, paddingTop: 60, paddingBottom: 10 },

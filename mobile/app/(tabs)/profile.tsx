@@ -354,7 +354,7 @@ export default function ProfileScreen() {
         <View style={styles.settingRow}>
           <View style={styles.settingBody}>
             <Text style={styles.settingLabel}>Privacy Shield</Text>
-            <Text style={styles.settingDesc}>Redacts occupants and interiors in the camera feed</Text>
+            <Text style={styles.settingDesc}>Blur faces and plates on photos before community sharing</Text>
           </View>
           <Switch
             value={privacyShieldEnabled}

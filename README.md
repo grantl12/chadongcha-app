@@ -1,6 +1,8 @@
 # 차동차 · ChaDongCha
 
-There's a GT-R idling at the light next to you. You have three seconds.
+There's a GT-R idling at the light next to you. Pearl white. R35. You knew it by the stance before you read the badge — haunches set wide, front lip sitting low like it means it. The twin-turbo VR38 idles somewhere below the traffic noise, patient.
+
+The light turns green. It's gone.
 
 ChaDongCha is a street-level vehicle hunting game. An on-device classifier identifies what's rolling past — make, model, generation — and lets you catch it like a collectible. Every road you scan belongs to someone. Satellite passes drop orbital XP boosts. The first player to catch a generation in your city gets a badge that never expires.
 
@@ -58,7 +60,7 @@ chadongcha/
 
 ## Game Modes
 
-**Dash Sentry** — Mount your phone. Tap "I am a Passenger." Drive.  
+**Dash Sentry** — Mount your phone. Tap "I am a Passenger."  
 Snapshots at 2fps, CoreML inference on every frame, catches vehicles automatically. A color-coded radar dot pulses in the corner: green on a catch, blue when orbital boost is active, red when idle. XP stacks up while the highway blurs past.
 
 **360° Scan** — Walk around the car. Four anchors: front, passenger, rear, driver.  

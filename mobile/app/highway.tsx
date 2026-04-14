@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, Animated } from 'react-native';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -45,6 +45,44 @@ function SafetyInterstitial({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
+// ── Radar dot pulse colours ───────────────────────────────────────────────────
+// green = recent catch  |  blue = orbital boost active  |  red = idle
+function dotColor(boostActive: boolean, catchFlash: 'catch' | null): string {
+  if (catchFlash === 'catch') return '#22c55e';
+  if (boostActive)            return '#4a9eff';
+  return '#e63946';
+}
+
+function RadarDot({ boostActive, catchFlash }: { boostActive: boolean; catchFlash: 'catch' | null }) {
+  const scale   = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(scale,   { toValue: 1.6, duration: 700, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0,   duration: 700, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(scale,   { toValue: 1, duration: 0, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 1, duration: 0, useNativeDriver: true }),
+        ]),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  const color = dotColor(boostActive, catchFlash);
+  return (
+    <View style={styles.dotWrap}>
+      <Animated.View style={[styles.dotRing, { backgroundColor: color, transform: [{ scale }], opacity }]} />
+      <View style={[styles.radarDot, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
 export default function DashSentry() {
   const device = useCameraDevice('back');
   const cameraRef = useRef<Camera>(null);
@@ -55,6 +93,8 @@ export default function DashSentry() {
   const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
   const boostActive = boostRemainingMin(orbitalBoostExpires) > 0;
 
+  const [catchFlash, setCatchFlash] = useState<'catch' | null>(null);
+  const catchFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [safetyConfirmed, setSafetyConfirmed] = useState(false);
   const [catchBanner, setCatchBanner] = useState<string | null>(null);
@@ -98,6 +138,9 @@ export default function DashSentry() {
       fuzzyDistrict: fuzzyDistrict ?? undefined,
     });
     showBanner(`CAUGHT: ${result.make} ${result.model} · ${Math.round(result.confidence * 100)}%`);
+    setCatchFlash('catch');
+    if (catchFlashTimer.current) clearTimeout(catchFlashTimer.current);
+    catchFlashTimer.current = setTimeout(() => setCatchFlash(null), 3500);
   }, [addCatch, fuzzyCity, fuzzyDistrict]);
 
   const handleProbable = useCallback((result: ClassifyResult) => {
@@ -146,7 +189,7 @@ export default function DashSentry() {
         {/* HUD dims above 15mph */}
         {isMoving ? (
           <View style={styles.minimalHud}>
-            <View style={styles.radarDot} />
+            <RadarDot boostActive={boostActive} catchFlash={catchFlash} />
           </View>
         ) : (
           <View style={styles.fullHud}>
@@ -177,7 +220,9 @@ const styles = StyleSheet.create({
   safetyBanner: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: '#e6394688', padding: 8, alignItems: 'center' },
   safetyText:   { color: '#fff', fontWeight: '900', letterSpacing: 3, fontSize: 12 },
   minimalHud:   { position: 'absolute', bottom: 40, alignSelf: 'center' },
-  radarDot:     { width: 12, height: 12, borderRadius: 6, backgroundColor: '#e63946' },
+  dotWrap:      { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  dotRing:      { position: 'absolute', width: 24, height: 24, borderRadius: 12, opacity: 0.4 },
+  radarDot:     { width: 10, height: 10, borderRadius: 5 },
   fullHud:      { position: 'absolute', bottom: 60, alignSelf: 'center' },
   speedLabel:   { color: '#ffffff88', fontSize: 13, letterSpacing: 2 },
   catchBanner:  { position: 'absolute', bottom: 140, left: 24, right: 24, backgroundColor: '#0a0a0aee', borderRadius: 10, padding: 16 },

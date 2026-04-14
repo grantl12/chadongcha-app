@@ -389,6 +389,11 @@ export default function ProfileScreen() {
         <Pressable style={styles.actionButton} onPress={() => router.push('/leaderboard')}>
           <Text style={styles.actionText}>LEADERBOARD</Text>
         </Pressable>
+        {userId && (
+          <Pressable style={styles.actionButton} onPress={() => router.push(`/player/${userId}`)}>
+            <Text style={styles.actionText}>MY PLAYER CARD</Text>
+          </Pressable>
+        )}
         <Pressable style={[styles.actionButton, styles.signOutButton]} onPress={handleSignOut}>
           <Text style={styles.signOutText}>SIGN OUT</Text>
         </Pressable>

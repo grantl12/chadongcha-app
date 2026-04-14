@@ -9,6 +9,7 @@ import {
   View, Text, StyleSheet, Pressable, Image,
   ActivityIndicator, ScrollView,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
@@ -52,11 +53,17 @@ export default function IdentifyScreen() {
     onSuccess(data, variables) {
       setResult({ ...data, guessed: variables.guessedLabel });
       setProfile(data.new_total_xp, data.new_level);
+      if (data.correct) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     },
   });
 
   function handleGuess(card: IdCard, option: string) {
     if (result || guessMutation.isPending) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     guessMutation.mutate({ queueItemId: card.id, guessedLabel: option });
   }
 

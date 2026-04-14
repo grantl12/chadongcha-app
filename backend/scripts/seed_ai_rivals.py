@@ -55,6 +55,8 @@ _CITY_TAG = {
     "Toronto":       "YYZ",
     "São Paulo":     "SAO",
     "Mexico City":   "MEX",
+    "Carrollton":    "CRL",
+    "Johnson City":  "JCY",
 }
 
 # How many ghost players to create per city (they spread across segments)

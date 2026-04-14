@@ -78,6 +78,71 @@ async def player_stats(player_id: str):
     }
 
 
+@router.get("/{player_id}/card")
+async def player_card(player_id: str):
+    """
+    Public-facing player card: username, level, xp, catch counts, road king count,
+    top first-finder badge. No auth required.
+    """
+    db = get_client()
+
+    player = db.table("players").select("id, username, xp, level") \
+        .eq("id", player_id).maybe_single().execute()
+    if player is None or not player.data:
+        raise HTTPException(status_code=404, detail="Player not found")
+    p = player.data
+
+    catches_res = db.table("catches") \
+        .select("id, generations(rarity_tier)") \
+        .eq("player_id", player_id) \
+        .execute()
+
+    by_rarity: dict[str, int] = {r: 0 for r in ["common", "uncommon", "rare", "epic", "legendary"]}
+    for row in (catches_res.data or []):
+        gen  = row.get("generations") or {}
+        tier = gen.get("rarity_tier") if gen else None
+        if tier in by_rarity:
+            by_rarity[tier] += 1
+    total_catches = sum(by_rarity.values())
+
+    from postgrest.types import CountMethod
+    roads_res = db.table("road_segments") \
+        .select("id", count=CountMethod.exact) \
+        .eq("king_id", player_id) \
+        .execute()
+    road_king_count = roads_res.count or 0
+
+    # Highest-scope first-finder badge
+    ff_res = db.table("first_finders") \
+        .select("badge_name, region_scope, awarded_at, "
+                "generations(common_name, models(name, makes(name)))") \
+        .eq("player_id", player_id) \
+        .order("awarded_at", desc=True) \
+        .limit(1) \
+        .execute()
+    top_badge = None
+    if ff_res.data:
+        ff = ff_res.data[0]
+        gen   = ff.get("generations") or {}
+        model = gen.get("models") or {}
+        make  = (model.get("makes") or {}).get("name", "")
+        mname = model.get("name", "")
+        vehicle = gen.get("common_name") or f"{make} {mname}".strip() or "Unknown"
+        top_badge = {"badge_name": ff["badge_name"], "vehicle_name": vehicle}
+
+    return {
+        "player_id":     p["id"],
+        "username":      p["username"],
+        "level":         p["level"],
+        "xp":            p["xp"],
+        "total_catches": total_catches,
+        "catches_by_rarity": by_rarity,
+        "road_king_count": road_king_count,
+        "top_badge":     top_badge,
+        "is_ai":         False,
+    }
+
+
 # ─── Plate hash opt-in ────────────────────────────────────────────────────────
 
 class PlateHashRequest(BaseModel):

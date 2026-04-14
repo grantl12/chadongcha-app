@@ -8,30 +8,21 @@ import { router } from 'expo-router';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
 
-type FeedCatch = {
+// ─── Activity feed types ─────────────────────────────────────────────────────
+
+type ActivityEvent = {
   id: string;
-  caught_at: string;
-  catch_type: 'highway' | 'scan360' | 'space' | 'unknown';
-  confidence: number | null;
-  color: string | null;
-  body_style: string | null;
+  event_type: 'catch' | 'road_king' | 'level_up' | 'first_finder' | 'market_sale';
   player_id: string;
-  players: { username: string } | null;
-  generations: {
-    common_name: string;
-    rarity_tier: string;
-    models: { name: string; makes: { name: string } };
-  } | null;
-  catchable_objects: {
-    space_objects: {
-      name: string;
-      object_type: string;
-      rarity_tier: string;
-    } | null;
-  } | null;
+  player_username: string;
+  catch_id: string | null;
+  created_at: string;
+  payload: Record<string, any>;
 };
 
-type Section = { title: string; data: FeedCatch[] };
+type Section = { title: string; data: ActivityEvent[] };
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const RARITY_COLOR: Record<string, string> = {
   common:    '#555',
@@ -47,6 +38,8 @@ const CATCH_TYPE_LABEL: Record<string, string> = {
   space:   'SPC',
   unknown: '???',
 };
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string): string {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -72,40 +65,26 @@ function sectionLabel(iso: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase();
 }
 
-function groupBySections(catches: FeedCatch[]): Section[] {
-  const map = new Map<string, FeedCatch[]>();
-  for (const c of catches) {
-    const label = sectionLabel(c.caught_at);
+function groupBySections(events: ActivityEvent[]): Section[] {
+  const map = new Map<string, ActivityEvent[]>();
+  for (const e of events) {
+    const label = sectionLabel(e.created_at);
     if (!map.has(label)) map.set(label, []);
-    map.get(label)!.push(c);
+    map.get(label)!.push(e);
   }
   return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
 }
 
-function vehicleInfo(item: FeedCatch) {
-  const spaceObj = item.catchable_objects?.space_objects;
-  if (item.catch_type === 'space' && spaceObj) {
-    return {
-      make:    'Space Object',
-      model:   spaceObj.name,
-      name:    spaceObj.object_type,
-      rarity:  spaceObj.rarity_tier,
-    };
-  }
-  const gen   = item.generations;
-  const make  = gen?.models?.makes?.name ?? '?';
-  const model = gen?.models?.name ?? '?';
-  const name  = gen?.common_name ?? 'Unknown Vehicle';
-  const rarity = gen?.rarity_tier ?? 'common';
-  return { make, model, name, rarity };
-}
+// ─── Activity items ───────────────────────────────────────────────────────────
 
-function FeedItem({ item, isMe }: { item: FeedCatch; isMe: boolean }) {
-  const { make, model, name, rarity } = vehicleInfo(item);
-  const rarityColor   = RARITY_COLOR[rarity] ?? '#555';
-  const isLegendary   = rarity === 'legendary';
-  const isEpic        = rarity === 'epic';
-  const isSpace       = item.catch_type === 'space';
+function CatchItem({ item, isMe }: { item: ActivityEvent; isMe: boolean }) {
+  const p           = item.payload;
+  const rarity      = p.rarity_tier ?? 'common';
+  const rarityColor = RARITY_COLOR[rarity] ?? '#555';
+  const isLegendary = rarity === 'legendary';
+  const isEpic      = rarity === 'epic';
+  const isSpace     = !!p.is_space;
+  const catchType   = p.catch_type ?? 'unknown';
 
   return (
     <View style={[
@@ -117,36 +96,145 @@ function FeedItem({ item, isMe }: { item: FeedCatch; isMe: boolean }) {
       <View style={styles.itemLeft}>
         <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
       </View>
-
       <View style={styles.itemBody}>
-        <Text style={styles.itemMake}>
-          {isSpace ? '🛰  SPACE' : make}
-        </Text>
-        <Text style={styles.itemModel}>{model}</Text>
-        <Text style={[styles.itemGen, { color: rarityColor }]}>{name}</Text>
-        {!isSpace && (item.color || item.body_style) ? (
+        <Text style={styles.itemMake}>{isSpace ? '🛰  SPACE' : 'CATCH'}</Text>
+        <Text style={styles.itemModel}>{p.vehicle_name ?? 'Unknown Vehicle'}</Text>
+        {!isSpace && (p.color || p.body_style) ? (
           <Text style={styles.itemMeta}>
-            {[item.color, item.body_style].filter(Boolean).join('  ·  ')}
+            {[p.color, p.body_style].filter(Boolean).join('  ·  ')}
           </Text>
         ) : null}
-        {!isSpace && item.confidence != null ? (
-          <Text style={styles.itemConf}>{Math.round(item.confidence * 100)}% conf</Text>
+        {!isSpace && p.confidence != null ? (
+          <Text style={styles.itemConf}>{Math.round(p.confidence * 100)}% conf</Text>
         ) : null}
       </View>
-
       <View style={styles.itemRight}>
         <View style={[styles.typeBadge, isSpace && styles.typeBadgeSpace]}>
           <Text style={[styles.typeBadgeText, isSpace && styles.typeBadgeTextSpace]}>
-            {CATCH_TYPE_LABEL[item.catch_type]}
+            {CATCH_TYPE_LABEL[catchType] ?? '?'}
           </Text>
         </View>
         <Text style={[styles.itemPlayer, isMe && styles.itemPlayerMe]}>
-          {item.players?.username ?? '—'}
+          {item.player_username}
         </Text>
-        <Text style={styles.itemTime}>{timeAgo(item.caught_at)}</Text>
+        <Text style={styles.itemTime}>{timeAgo(item.created_at)}</Text>
       </View>
     </View>
   );
+}
+
+function RoadKingItem({ item, isMe }: { item: ActivityEvent; isMe: boolean }) {
+  const p = item.payload;
+  return (
+    <View style={[styles.item, styles.itemEvent, isMe && styles.itemMine]}>
+      <View style={styles.itemLeft}>
+        <View style={[styles.rarityBar, { backgroundColor: '#f59e0b' }]} />
+      </View>
+      <View style={styles.itemBody}>
+        <Text style={styles.itemMake}>ROAD KING</Text>
+        <Text style={styles.itemModel}>{p.road_name ?? 'Unknown Road'}</Text>
+        {p.city ? <Text style={styles.itemMeta}>{p.city}</Text> : null}
+      </View>
+      <View style={styles.itemRight}>
+        <View style={[styles.typeBadge, { backgroundColor: '#1a1200' }]}>
+          <Text style={[styles.typeBadgeText, { color: '#f59e0b' }]}>KING</Text>
+        </View>
+        <Text style={[styles.itemPlayer, isMe && styles.itemPlayerMe]}>
+          {item.player_username}
+        </Text>
+        <Text style={styles.itemTime}>{timeAgo(item.created_at)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function LevelUpItem({ item, isMe }: { item: ActivityEvent; isMe: boolean }) {
+  const p = item.payload;
+  return (
+    <View style={[styles.item, styles.itemEvent, isMe && styles.itemMine]}>
+      <View style={styles.itemLeft}>
+        <View style={[styles.rarityBar, { backgroundColor: '#22d3ee' }]} />
+      </View>
+      <View style={styles.itemBody}>
+        <Text style={styles.itemMake}>LEVEL UP</Text>
+        <Text style={styles.itemModel}>Level {p.new_level ?? '?'} reached</Text>
+      </View>
+      <View style={styles.itemRight}>
+        <View style={[styles.typeBadge, { backgroundColor: '#001a1a' }]}>
+          <Text style={[styles.typeBadgeText, { color: '#22d3ee' }]}>LVL</Text>
+        </View>
+        <Text style={[styles.itemPlayer, isMe && styles.itemPlayerMe]}>
+          {item.player_username}
+        </Text>
+        <Text style={styles.itemTime}>{timeAgo(item.created_at)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function FirstFinderItem({ item, isMe }: { item: ActivityEvent; isMe: boolean }) {
+  const p = item.payload;
+  return (
+    <View style={[styles.item, styles.itemEvent, isMe && styles.itemMine]}>
+      <View style={styles.itemLeft}>
+        <View style={[styles.rarityBar, { backgroundColor: '#e63946' }]} />
+      </View>
+      <View style={styles.itemBody}>
+        <Text style={styles.itemMake}>FIRST FINDER</Text>
+        <Text style={styles.itemModel}>{p.vehicle_name ?? 'Unknown Vehicle'}</Text>
+        {p.badge_name ? (
+          <Text style={[styles.itemMeta, { color: '#e63946' }]}>{p.badge_name}</Text>
+        ) : null}
+      </View>
+      <View style={styles.itemRight}>
+        <View style={[styles.typeBadge, { backgroundColor: '#1a0505' }]}>
+          <Text style={[styles.typeBadgeText, { color: '#e63946' }]}>1ST</Text>
+        </View>
+        <Text style={[styles.itemPlayer, isMe && styles.itemPlayerMe]}>
+          {item.player_username}
+        </Text>
+        <Text style={styles.itemTime}>{timeAgo(item.created_at)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function MarketSaleItem({ item, isMe }: { item: ActivityEvent; isMe: boolean }) {
+  const p           = item.payload;
+  const rarity      = p.rarity_tier ?? 'common';
+  const rarityColor = RARITY_COLOR[rarity] ?? '#555';
+  return (
+    <View style={[styles.item, styles.itemEvent, isMe && styles.itemMine]}>
+      <View style={styles.itemLeft}>
+        <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
+      </View>
+      <View style={styles.itemBody}>
+        <Text style={styles.itemMake}>MARKET SALE</Text>
+        <Text style={styles.itemModel}>{p.vehicle_name ?? 'Unknown Vehicle'}</Text>
+        <Text style={styles.itemMeta}>{p.credits ?? 0} CR</Text>
+      </View>
+      <View style={styles.itemRight}>
+        <View style={[styles.typeBadge, { backgroundColor: '#0a1200' }]}>
+          <Text style={[styles.typeBadgeText, { color: '#4ade80' }]}>SOLD</Text>
+        </View>
+        <Text style={[styles.itemPlayer, isMe && styles.itemPlayerMe]}>
+          {item.player_username}
+        </Text>
+        <Text style={styles.itemTime}>{timeAgo(item.created_at)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ActivityItem({ item, isMe }: { item: ActivityEvent; isMe: boolean }) {
+  switch (item.event_type) {
+    case 'catch':        return <CatchItem       item={item} isMe={isMe} />;
+    case 'road_king':    return <RoadKingItem     item={item} isMe={isMe} />;
+    case 'level_up':     return <LevelUpItem      item={item} isMe={isMe} />;
+    case 'first_finder': return <FirstFinderItem  item={item} isMe={isMe} />;
+    case 'market_sale':  return <MarketSaleItem   item={item} isMe={isMe} />;
+    default:             return null;
+  }
 }
 
 function SectionHeader({ title }: { title: string }) {
@@ -236,19 +324,21 @@ function UnknownTab() {
   );
 }
 
+// ─── Main screen ─────────────────────────────────────────────────────────────
+
 type Filter = 'all' | 'mine' | 'unknown';
 
 export default function FeedScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const userId = usePlayerStore(s => s.userId);
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['feed', filter, userId],
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<ActivityEvent[]>({
+    queryKey: ['feed-activities', filter, userId],
     queryFn: () => {
-      if (filter === 'unknown') return Promise.resolve([] as FeedCatch[]); // handled by UnknownTab
-      const base = '/catches/recent?limit=50';
+      if (filter === 'unknown') return Promise.resolve([]);
+      const base = '/feed/activities?limit=50';
       const url  = filter === 'mine' && userId ? `${base}&player_id=${userId}` : base;
-      return apiClient.get(url) as Promise<FeedCatch[]>;
+      return apiClient.get(url) as Promise<ActivityEvent[]>;
     },
     enabled: filter !== 'unknown',
     refetchInterval: 30_000,
@@ -301,12 +391,12 @@ export default function FeedScreen() {
       ) : sections.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>
-            {filter === 'mine' ? 'NO CATCHES YET' : 'EMPTY'}
+            {filter === 'mine' ? 'NO ACTIVITY YET' : 'EMPTY'}
           </Text>
           <Text style={styles.emptyText}>
             {filter === 'mine'
-              ? 'Head to Radar and start hunting.'
-              : 'No catches yet. Be the first.'}
+              ? 'Head to Ops and start hunting.'
+              : 'No activity yet. Be the first.'}
           </Text>
         </View>
       ) : (
@@ -314,7 +404,7 @@ export default function FeedScreen() {
           sections={sections}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <FeedItem item={item} isMe={item.player_id === userId} />
+            <ActivityItem item={item} isMe={item.player_id === userId} />
           )}
           renderSectionHeader={({ section }) => (
             <SectionHeader title={section.title} />
@@ -352,6 +442,7 @@ const styles = StyleSheet.create({
   item:               { flexDirection: 'row', paddingVertical: 14, paddingRight: 20, borderBottomWidth: 1, borderBottomColor: '#111' },
   itemLegendary:      { backgroundColor: '#1a0505' },
   itemEpic:           { backgroundColor: '#120e02' },
+  itemEvent:          { backgroundColor: '#0c0c0c' },
   itemMine:           { backgroundColor: '#110008' },
 
   itemLeft:           { width: 20, alignItems: 'center', paddingTop: 4 },

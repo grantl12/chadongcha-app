@@ -16,15 +16,17 @@ import argparse
 import json
 from pathlib import Path
 
-DATA_DIR   = Path(__file__).parent.parent / "data" / "images"
-MODELS_DIR = Path(__file__).parent.parent / "models"
-EXPORT_DIR = Path(__file__).parent.parent / "export"
+_BASE      = Path(__file__).parent.parent
+DATA_DIR   = _BASE / "data" / "images"
+MODELS_DIR = _BASE / "models"
+EXPORT_DIR = _BASE / "export"
 
 IMGSZ = 224  # MobileNetV3 native resolution
 
-# Generation taxonomy — top 30 at bootstrap, grows to 300 pre-launch
+# Generation taxonomy — must stay in sync with CLASS_QUERIES in scrape_images.py
 # Format: "Make Model GenerationCode"
 GENERATION_CLASSES = [
+    # ── Cars ────────────────────────────────────────────────────────────────
     "Toyota GR86 ZN8",
     "Toyota Supra A90",
     "Toyota Camry XV70",
@@ -55,6 +57,20 @@ GENERATION_CLASSES = [
     "Ferrari SF90 F173",
     "Lamborghini Huracan LB724",
     "Bugatti Chiron VGT",
+    # ── Trucks ──────────────────────────────────────────────────────────────
+    "Ram 1500 DT",
+    "Toyota Tacoma AN120",
+    "Toyota Tundra XK70",
+    "Ford Ranger P703",
+    # ── Motorcycles ─────────────────────────────────────────────────────────
+    "Ducati Panigale V4",
+    "Honda CBR1000RR-R",
+    "Kawasaki Ninja ZX-10R",
+    "Yamaha YZF-R1",
+    "Harley-Davidson Sportster S",
+    "BMW S1000RR K67",
+    # ── Background / negative class ─────────────────────────────────────────
+    "_Background",
 ]
 
 
@@ -64,7 +80,7 @@ def phase_info():
         print(f"  {i:3d}  {cls}")
 
 
-def phase_classify(epochs: int, resume: bool = False):
+def phase_classify(epochs: int, resume: bool = False, patience: int = 7):
     try:
         import torch
         import torch.nn as nn
@@ -141,9 +157,10 @@ def phase_classify(epochs: int, resume: bool = False):
     print(f"Train   : {len(train_idx)} images")
     print(f"Val     : {len(val_idx)} images")
 
-    checkpoint_path = MODELS_DIR / "best.pt"
-    start_epoch = 1
-    best_acc    = 0.0
+    checkpoint_path  = MODELS_DIR / "best.pt"
+    start_epoch      = 1
+    best_acc         = 0.0
+    epochs_no_improve = 0
 
     model = timm.create_model("mobilenetv3_large_100", pretrained=True, num_classes=n_classes)
 
@@ -191,10 +208,17 @@ def phase_classify(epochs: int, resume: bool = False):
 
         val_acc  = correct / total
         avg_loss = running_loss / len(train_loader)
-        marker   = "  ✓ best" if val_acc > best_acc else ""
+
+        improved = val_acc > best_acc
+        if improved:
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        marker = f"  ✓ best" if improved else f"  (no improvement {epochs_no_improve}/{patience})"
         print(f"Epoch {epoch:3d}/{total_epochs}  loss={avg_loss:.4f}  val_acc={val_acc:.3f}{marker}")
 
-        if val_acc > best_acc:
+        if improved:
             best_acc = val_acc
             torch.save(
                 {
@@ -207,6 +231,10 @@ def phase_classify(epochs: int, resume: bool = False):
                 },
                 MODELS_DIR / "best.pt",
             )
+
+        if epochs_no_improve >= patience:
+            print(f"\nEarly stopping — val_acc has not improved for {patience} consecutive epochs.")
+            break
 
     print(f"\nTraining complete.  Best val acc: {best_acc:.3f}")
     print(f"Checkpoint: {MODELS_DIR / 'best.pt'}")
@@ -336,11 +364,20 @@ if __name__ == "__main__":
     parser.add_argument("--phase", choices=["info", "classify", "export"], required=True)
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--resume", action="store_true", help="Resume from best.pt checkpoint")
+    parser.add_argument("--patience", type=int, default=7,
+                        help="Early stopping: epochs without val_acc improvement before stopping (default 7)")
+    parser.add_argument("--data-dir", dest="data_dir", default=None,
+                        help="Override image dataset directory (default: ml/data/images)")
     args = parser.parse_args()
+
+    if args.data_dir:
+        DATA_DIR   = Path(args.data_dir)
+        MODELS_DIR = DATA_DIR.parent.parent / "models"
+        EXPORT_DIR = DATA_DIR.parent.parent / "export"
 
     if args.phase == "info":
         phase_info()
     elif args.phase == "classify":
-        phase_classify(args.epochs, resume=args.resume)
+        phase_classify(args.epochs, resume=args.resume, patience=args.patience)
     elif args.phase == "export":
         phase_export()

@@ -456,6 +456,36 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- ============================================================
+-- CONTENT MODERATION
+-- ============================================================
+
+-- Moderation status for community photos attached to unknown_catches
+alter table unknown_catches add column if not exists moderation_status text
+  not null default 'skipped'
+  check (moderation_status in ('pending','approved','rejected','skipped'));
+
+-- ============================================================
+-- ACTIVITY FEED
+-- ============================================================
+
+create table if not exists activity_feed (
+  id          uuid primary key default uuid_generate_v4(),
+  player_id   uuid not null references players(id) on delete cascade,
+  event_type  text not null check (event_type in ('catch','road_king','level_up','first_finder','market_sale')),
+  catch_id    uuid references catches(id) on delete set null,
+  payload     jsonb not null default '{}',
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists activity_feed_created_idx on activity_feed(created_at desc);
+create index if not exists activity_feed_player_idx  on activity_feed(player_id, created_at desc);
+
+alter table activity_feed enable row level security;
+do $$ begin
+  create policy "activity_feed_public_read" on activity_feed for select using (true);
+exception when duplicate_object then null; end $$;
+
+-- ============================================================
 -- UPDATED_AT TRIGGER
 -- ============================================================
 

@@ -17,6 +17,7 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 from db import get_client
+from services import feed_service
 
 router = APIRouter()
 
@@ -347,7 +348,7 @@ async def accept_bid(listing_id: str, body: AcceptBidBody, authorization: str = 
     seller_id = _resolve_player(db, authorization)
 
     listing = db.table("market_listings") \
-        .select("id, seller_id, catch_id, status, asking_price") \
+        .select("id, seller_id, catch_id, status, asking_price, make, model, generation, rarity") \
         .eq("id", listing_id) \
         .maybe_single() \
         .execute()
@@ -399,6 +400,15 @@ async def accept_bid(listing_id: str, body: AcceptBidBody, authorization: str = 
         {"player_id": buyer_id,  "delta": -sale_price, "reason": "market_purchase", "ref_id": listing_id},
         {"player_id": seller_id, "delta":  sale_price, "reason": "market_sale",     "ref_id": listing_id},
     ]).execute()
+
+    # Activity feed — market sale event
+    ld = listing.data
+    vehicle_name = " ".join(filter(None, [ld.get("make"), ld.get("model"), ld.get("generation")])).strip()
+    feed_service.write_event(db, seller_id, "market_sale", payload={
+        "vehicle_name": vehicle_name or "Unknown Vehicle",
+        "rarity_tier":  ld.get("rarity", "common"),
+        "credits":      sale_price,
+    })
 
     return {"ok": True, "sale_price": sale_price}
 

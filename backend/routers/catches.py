@@ -1,12 +1,14 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 from db import get_client
+from config import settings
 from services.xp_service import compute_xp, apply_xp, session_catch_count, get_orbital_boost, ROAD_KING_TAKEOVER_XP
 from services.territory_service import record_road_scan
 from services.first_finder_service import check_first_finder
+from services import feed_service
 from services.notification_service import (
     notify_road_king_taken, notify_road_king_claimed,
     notify_level_up, notify_first_finder,
@@ -95,8 +97,31 @@ class CatchPayload(BaseModel):
     photo_ref: Optional[str] = None
 
 
+async def _moderate_photo_bg(photo_key: str, unknown_catch_id: str) -> None:
+    """
+    BackgroundTask: run SafeSearch on the submitted photo and update
+    unknown_catches.photo_shared + moderation_status accordingly.
+    Non-fatal — any exception is swallowed (logged inside moderation_service).
+    """
+    from services.moderation_service import check_photo, ModerationResult
+    db = get_client()
+    result = await check_photo(settings.r2_public_url, photo_key)
+    approved = result in (ModerationResult.APPROVED, ModerationResult.SKIPPED)
+    try:
+        db.table("unknown_catches").update({
+            "photo_shared":      approved,
+            "moderation_status": result.value,
+        }).eq("id", unknown_catch_id).execute()
+    except Exception:
+        pass
+
+
 @router.post("")
-async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
+async def ingest_catch(
+    background_tasks: BackgroundTasks,
+    body: CatchPayload,
+    authorization: str = Header(...),
+):
     db = get_client()
 
     # Resolve player from JWT
@@ -197,10 +222,11 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
 
     combined_boost = orbital_boost * shop_xp_boost
 
+    rarity = _get_rarity(db, body.generation_id)
     xp_earned, xp_reasons = compute_xp(
         catch_type=body.catch_type,
         generation_id=body.generation_id,
-        rarity_tier=_get_rarity(db, body.generation_id),
+        rarity_tier=rarity,
         is_personal_first=is_personal_first,
         session_same_gen_count=same_gen_count,
         orbital_boost=combined_boost,
@@ -250,18 +276,26 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
     # AND a photo was submitted (no photo = nothing to show reviewers).
     if not body.generation_id and body.photo_ref:
         try:
-            db.table("unknown_catches").insert({
+            uc_result = db.table("unknown_catches").insert({
                 "catch_id":            catch_id,
                 "body_type":           body.body_style,
                 "city":                body.fuzzy_city,
                 "community_photo_ref": body.photo_ref,
-                "photo_shared":        True,
+                # Start hidden — background task sets photo_shared after moderation
+                "photo_shared":        False,
+                "moderation_status":   "pending",
                 "status":              "open",
             }).execute()
+            if uc_result.data:
+                # Fire moderation check in background; never blocks the catch response
+                background_tasks.add_task(
+                    _moderate_photo_bg, body.photo_ref, uc_result.data[0]["id"]
+                )
         except Exception:
             pass  # Non-fatal — catch is already recorded
 
     # First finder
+    vehicle_name = _get_vehicle_name(db, body.generation_id) if body.generation_id else None
     first_finder_awarded = None
     if body.generation_id:
         first_finder_awarded = check_first_finder(
@@ -269,8 +303,38 @@ async def ingest_catch(body: CatchPayload, authorization: str = Header(...)):
             body.fuzzy_city, catch_id,
         )
         if first_finder_awarded:
-            vehicle_name = _get_vehicle_name(db, body.generation_id)
-            notify_first_finder(db, player_id, first_finder_awarded.get("badge", ""), vehicle_name)
+            notify_first_finder(db, player_id, first_finder_awarded.get("badge", ""), vehicle_name or "")
+
+    # ── Activity feed events ──────────────────────────────────────────────────
+    # catch event — written for every non-duplicate catch
+    _catch_payload: dict = {
+        "catch_type":  body.catch_type,
+        "rarity_tier": rarity or "common",
+        "vehicle_name": vehicle_name or "Unknown Vehicle",
+        "color":       body.color,
+        "body_style":  body.body_style,
+        "confidence":  body.confidence,
+        "is_space":    body.catch_type == "space",
+    }
+    feed_service.write_event(db, player_id, "catch", catch_id=catch_id, payload=_catch_payload)
+
+    if road_king_claimed and body.road_segment_id:
+        feed_service.write_event(db, player_id, "road_king", catch_id=catch_id, payload={
+            "road_name": _get_road_name(db, body.road_segment_id),
+            "city":      body.fuzzy_city,
+        })
+
+    if level_up:
+        feed_service.write_event(db, player_id, "level_up", catch_id=catch_id, payload={
+            "new_level": new_level,
+        })
+
+    if first_finder_awarded:
+        feed_service.write_event(db, player_id, "first_finder", catch_id=catch_id, payload={
+            "vehicle_name":  vehicle_name or "Unknown Vehicle",
+            "region_scope":  first_finder_awarded.get("region_scope"),
+            "badge_name":    first_finder_awarded.get("badge", ""),
+        })
 
     return {
         "catch_id": catch_id,

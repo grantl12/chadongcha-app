@@ -1,7 +1,21 @@
-ultralytics
+# ── Core ML ──────────────────────────────────────────────────────────────────
+# Install PyTorch separately (GPU-specific index URL — see README):
+#   NVIDIA CUDA 12.4:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+#   AMD Windows (DirectML): pip install torch torchvision torch-directml
+#   CPU only:          pip install torch torchvision
 torch
 torchvision
 timm
-coremltools
+
+# ── Scraper (scrape_images.py) ────────────────────────────────────────────────
+duckduckgo_search
+requests
+Pillow
+
+# ── Export ────────────────────────────────────────────────────────────────────
 onnx
 onnxruntime
+
+# ── macOS / Linux only (CoreML export) ────────────────────────────────────────
+# Uncomment on macOS to enable .mlpackage export:
+# coremltools

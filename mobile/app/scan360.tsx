@@ -105,7 +105,7 @@ export default function Scan360Screen() {
           ),
         ]);
 
-        if (!classification || classification.confidence < MIN_CONFIDENCE) {
+        if (!classification || classification.confidence < MIN_CONFIDENCE || classification.make === '_Background') {
           // Reject — stay on FRONT, clear the bad photo
           setLowConfidence(true);
           tempPhotos.current[0] = null;

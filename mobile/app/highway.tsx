@@ -118,7 +118,7 @@ export default function DashSentry() {
       try {
         const snapshot = await cameraRef.current.takeSnapshot({ quality: 85 });
         const result   = await Classifier.classify(snapshot.path);
-        if (!result) return;
+        if (!result || result.make === '_Background') return;
 
         if (result.confidence >= autoCatchThreshold) {
           handleCatch(result);

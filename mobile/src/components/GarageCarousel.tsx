@@ -83,10 +83,12 @@ function CarouselCard({
   item,
   offset,     // position relative to active: -2, -1, 0, 1, 2
   dragX,      // shared Animated.Value for live drag tracking
+  onSellPress,
 }: {
   item: CatchRecord;
   offset: number;
   dragX: Animated.Value;
+  onSellPress?: (item: CatchRecord) => void;
 }) {
   const rarity  = item.rarity ?? 'common';
   const accent  = RARITY_COLOR[rarity]  ?? '#444';
@@ -164,21 +166,39 @@ function CarouselCard({
         ) : null}
       </View>
 
-      {/* Detail tap — active card only */}
-      {isActive && item.generationId && (
-        <Pressable
-          style={[styles.detailButton, { borderColor: accent + '55' }]}
-          onPress={() => router.push(`/vehicle/${item.generationId}`)}
-        >
-          <Text style={[styles.detailText, { color: accent }]}>VIEW DETAILS →</Text>
-        </Pressable>
+      {/* Detail + sell buttons — active card only */}
+      {isActive && (
+        <View style={styles.actionRow}>
+          {item.generationId && (
+            <Pressable
+              style={[styles.detailButton, { borderColor: accent + '55', flex: 1 }]}
+              onPress={() => router.push(`/vehicle/${item.generationId}`)}
+            >
+              <Text style={[styles.detailText, { color: accent }]}>DETAILS →</Text>
+            </Pressable>
+          )}
+          {item.synced && onSellPress && (
+            <Pressable
+              style={[styles.detailButton, styles.sellButton, { borderColor: '#e6394655' }]}
+              onPress={() => onSellPress(item)}
+            >
+              <Text style={[styles.detailText, { color: '#e63946' }]}>SELL</Text>
+            </Pressable>
+          )}
+        </View>
       )}
     </Animated.View>
   );
 }
 
 // ── Main carousel ──────────────────────────────────────────────────────────────
-export function GarageCarousel({ catches }: { catches: CatchRecord[] }) {
+export function GarageCarousel({
+  catches,
+  onSellPress,
+}: {
+  catches: CatchRecord[];
+  onSellPress?: (item: CatchRecord) => void;
+}) {
   const [activeIndex, setActiveIndex] = useState(0);
   const dragX  = useRef(new Animated.Value(0)).current;
 
@@ -237,6 +257,7 @@ export function GarageCarousel({ catches }: { catches: CatchRecord[] }) {
               item={c}
               offset={offset}
               dragX={dragX}
+              onSellPress={onSellPress}
             />
           );
         })}
@@ -395,13 +416,22 @@ const styles = StyleSheet.create({
   infoColor:  { color: '#444', fontSize: 11, marginTop: 2 },
   xpBadge:    { fontSize: 12, fontWeight: '800', marginTop: 2 },
 
-  detailButton: {
+  actionRow: {
+    flexDirection: 'row',
     marginHorizontal: 18,
     marginBottom: 16,
+    gap: 8,
+  },
+  detailButton: {
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 9,
     alignItems: 'center',
+    flex: 1,
+  },
+  sellButton: {
+    flex: 0,
+    paddingHorizontal: 18,
   },
   detailText: { fontSize: 11, fontWeight: '800', letterSpacing: 2 },
 

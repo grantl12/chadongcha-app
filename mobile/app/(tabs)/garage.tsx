@@ -337,7 +337,7 @@ function MarketTab({ mycatches }: { mycatches: CatchRecord[] }) {
 
   useEffect(() => { fetchListings(); }, []);
 
-  const syncedForSale = mycatches.filter(c => c.synced && c.generationId);
+  const syncedForSale = mycatches.filter(c => c.synced);
 
   return (
     <View style={{ flex: 1 }}>
@@ -659,7 +659,7 @@ export default function GarageScreen() {
               </View>
             </View>
             {catchViewMode === '3d' ? (
-              <GarageCarousel catches={catches} />
+              <GarageCarousel catches={catches} onSellPress={setSellTarget} />
             ) : (
               <FlatList
                 data={catches}

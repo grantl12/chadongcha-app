@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     r2_bucket_assets: str = "chadongcha-assets"
     r2_public_url: str = ""
     app_env: str = "development"
-    model_current_version: str = "0.0.1"
+    model_current_version: str = "0.1.0"
 
     def origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]

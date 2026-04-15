@@ -6,5 +6,4 @@ dockerfilePath = "backend/Dockerfile.sat"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
-[deploy.watchPatterns]
-include = ["backend/**", "railway.sat.toml"]
+watchPatterns = ["backend/**", "railway.sat.toml"]

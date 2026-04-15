@@ -19,8 +19,7 @@ healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
-[deploy.watchPatterns]
-include = ["backend/**", "railway.toml"]
+watchPatterns = ["backend/**", "railway.toml"]
 
 # ---------------------------------------------------------------------------
 # Seeder service: in Railway dashboard → service Settings → Config Path

@@ -6,5 +6,4 @@ dockerfilePath = "backend/Dockerfile.seeder"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
-[deploy.watchPatterns]
-include = ["backend/**", "railway.seeder.toml"]
+watchPatterns = ["backend/**", "railway.seeder.toml"]

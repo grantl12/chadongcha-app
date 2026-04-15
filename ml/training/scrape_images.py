@@ -231,6 +231,107 @@ CLASS_QUERIES = {
         "Bugatti Chiron 2017 2018 photo",
         "Chiron supercar real photo",
     ],
+    # ── SUVs / Off-Road ────────────────────────────────────────────────────
+    "Ford Bronco U725": [
+        "Ford Bronco 2021 exterior side view",
+        "Ford Bronco 2022 2023 two-door four-door street photo",
+        "Bronco U725 outdoor trail photo",
+        "Ford Bronco Badlands Wildtrak real photo",
+    ],
+    "Toyota 4Runner N280": [
+        "Toyota 4Runner 2014 N280 exterior side view",
+        "4Runner TRD Pro 2020 2021 street photo",
+        "Toyota 4Runner fifth generation outdoor photo",
+        "4Runner N280 SUV real photo side",
+    ],
+    "Toyota Land_Cruiser J300": [
+        "Toyota Land Cruiser 300 2022 exterior side view",
+        "Land Cruiser J300 2022 2023 street photo",
+        "LC300 Toyota outdoor photo real",
+        "Toyota Land Cruiser 2022 white side view",
+    ],
+    "Mercedes G-Class W464": [
+        "Mercedes G-Class W464 2019 exterior side view",
+        "G-Wagon AMG G63 W464 street photo",
+        "Mercedes G 63 AMG 2020 2021 real photo",
+        "G-Class 2021 2022 outdoor white black photo",
+    ],
+    # ── Trucks ─────────────────────────────────────────────────────────────
+    "Jeep Gladiator JT": [
+        "Jeep Gladiator JT 2020 exterior side view",
+        "Gladiator Rubicon pickup truck street photo",
+        "Jeep Gladiator 2021 2022 real photo outdoor",
+        "Gladiator JT midsize truck side view",
+    ],
+    "GMC Sierra T1": [
+        "GMC Sierra 1500 2019 T1 exterior side view",
+        "Sierra AT4 Denali 2020 2021 street photo",
+        "GMC Sierra 2021 2022 pickup truck real photo",
+        "Sierra T1 2022 outdoor side view photo",
+    ],
+    # ── Sports / Muscle ────────────────────────────────────────────────────
+    "Nissan GT-R R35": [
+        "Nissan GT-R R35 exterior side view",
+        "GTR R35 Godzilla street photo real",
+        "Nissan GT-R 2017 2018 2019 photo outdoor",
+        "GT-R Nismo R35 real photo",
+    ],
+    "Nissan 370Z Z34": [
+        "Nissan 370Z Z34 exterior side view",
+        "370Z coupe street photo real 2015 2016",
+        "Nissan 370Z Nismo 2018 2019 photo",
+        "370Z Z34 coupe real photo",
+    ],
+    "Dodge Charger LD": [
+        "Dodge Charger 2015 LD exterior side view",
+        "Charger Hellcat SRT Widebody street photo",
+        "Dodge Charger 2018 2019 2020 real photo",
+        "Charger SRT 392 Scat Pack outdoor photo",
+    ],
+    "Acura NSX NC1": [
+        "Acura NSX NC1 2017 exterior side view",
+        "NSX second generation 2017 2018 street photo",
+        "Acura NSX 2019 2020 real photo outdoor",
+        "NSX NC1 supercar side view real",
+    ],
+    "Audi RS5 FY": [
+        "Audi RS5 FY 2018 exterior side view",
+        "RS5 B9 coupe Sportback street photo 2018 2019",
+        "Audi RS5 2020 2021 real photo outdoor",
+        "RS5 competition Nardo Grey photo side",
+    ],
+    "Honda Civic Type_R FL5": [
+        "Honda Civic Type R FL5 2023 exterior side view",
+        "Civic Type R 2023 2024 championship white street photo",
+        "FL5 Type R hatchback real photo outdoor",
+        "Honda Civic Type R 2023 red blue side view",
+    ],
+    # ── Luxury ─────────────────────────────────────────────────────────────
+    "Cadillac CT5-V BW": [
+        "Cadillac CT5-V Blackwing 2022 exterior side view",
+        "CT5-V Blackwing sedan street photo 2022 2023",
+        "Cadillac Blackwing 2022 real photo outdoor",
+        "CT5-V Blackwing dark shadow grey photo",
+    ],
+    "Genesis G80 RG3": [
+        "Genesis G80 2021 RG3 exterior side view",
+        "G80 third generation 2021 2022 street photo",
+        "Genesis G80 2022 2023 real photo sedan",
+        "G80 luxury sedan outdoor photo side",
+    ],
+    # ── Korean EVs ─────────────────────────────────────────────────────────
+    "Hyundai IONIQ5 NE1": [
+        "Hyundai IONIQ 5 2022 exterior side view",
+        "IONIQ5 NE1 2022 2023 street photo real",
+        "Hyundai IONIQ 5 white phantom outdoor photo",
+        "IONIQ 5 EV crossover 2023 real photo side",
+    ],
+    "Kia EV6 CV": [
+        "Kia EV6 2022 exterior side view",
+        "EV6 CV 2022 2023 street photo real",
+        "Kia EV6 GT-Line outdoor photo white",
+        "EV6 electric crossover 2023 real photo side",
+    ],
     # ── Vans ───────────────────────────────────────────────────────────────
     "Honda Odyssey RL6": [
         "Honda Odyssey 2023 exterior side view",
@@ -246,6 +347,30 @@ CLASS_QUERIES = {
         "Tesla Model S refresh 2021 street photo",
         "Tesla Model S Plaid white exterior",
         "Tesla Model S 2022 2023 real photo side",
+    ],
+    "Tesla Model_3 Highland": [
+        "Tesla Model 3 2023 Highland exterior side view",
+        "Model 3 Highland refresh 2024 street photo",
+        "Tesla Model 3 2023 2024 white real photo",
+        "Tesla Model 3 Highland sedan outdoor photo",
+    ],
+    "Tesla Model_Y JY": [
+        "Tesla Model Y 2021 exterior side view",
+        "Model Y crossover 2022 2023 street photo",
+        "Tesla Model Y white outdoor photo real",
+        "Model Y SUV 2023 2024 real photo side",
+    ],
+    "Tesla Model_X GX": [
+        "Tesla Model X 2021 exterior side view",
+        "Model X Plaid refresh 2021 2022 street photo",
+        "Tesla Model X falcon door outdoor real photo",
+        "Model X SUV white 2022 2023 real photo",
+    ],
+    "Tesla Cybertruck": [
+        "Tesla Cybertruck 2024 exterior side view",
+        "Cybertruck stainless steel street photo real",
+        "Tesla Cybertruck outdoor 2024 real photo",
+        "Cybertruck pickup truck silver photo side",
     ],
     # ── Background / negative class ────────────────────────────────────────
     # Critical: without a "not a vehicle" class, softmax always forces a winner.

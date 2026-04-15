@@ -57,11 +57,31 @@ GENERATION_CLASSES = [
     "Ferrari SF90 F173",
     "Lamborghini Huracan LB724",
     "Bugatti Chiron VGT",
+    # ── SUVs / Off-Road ──────────────────────────────────────────────────────
+    "Ford Bronco U725",
+    "Toyota 4Runner N280",
+    "Toyota Land_Cruiser J300",
+    "Mercedes G-Class W464",
     # ── Trucks ──────────────────────────────────────────────────────────────
     "Ram 1500 DT",
     "Toyota Tacoma AN120",
     "Toyota Tundra XK70",
     "Ford Ranger P703",
+    "Jeep Gladiator JT",
+    "GMC Sierra T1",
+    # ── Sports / Muscle ─────────────────────────────────────────────────────
+    "Nissan GT-R R35",
+    "Nissan 370Z Z34",
+    "Dodge Charger LD",
+    "Acura NSX NC1",
+    "Audi RS5 FY",
+    "Honda Civic Type_R FL5",
+    # ── Luxury ───────────────────────────────────────────────────────────────
+    "Cadillac CT5-V BW",
+    "Genesis G80 RG3",
+    # ── Korean ───────────────────────────────────────────────────────────────
+    "Hyundai IONIQ5 NE1",
+    "Kia EV6 CV",
     # ── Motorcycles ─────────────────────────────────────────────────────────
     "Ducati Panigale V4",
     "Honda CBR1000RR-R",
@@ -73,6 +93,10 @@ GENERATION_CLASSES = [
     "Honda Odyssey RL6",
     # ── EVs ──────────────────────────────────────────────────────────────────
     "Tesla Model_S Plaid",
+    "Tesla Model_3 Highland",
+    "Tesla Model_Y JY",
+    "Tesla Model_X GX",
+    "Tesla Cybertruck",
     # ── Background / negative class ─────────────────────────────────────────
     "_Background",
 ]
@@ -84,7 +108,7 @@ def phase_info():
         print(f"  {i:3d}  {cls}")
 
 
-def phase_classify(epochs: int, resume: bool = False, patience: int = 7):
+def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
     try:
         import torch
         import torch.nn as nn
@@ -366,10 +390,10 @@ def phase_export():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--phase", choices=["info", "classify", "export"], required=True)
-    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--resume", action="store_true", help="Resume from best.pt checkpoint")
-    parser.add_argument("--patience", type=int, default=7,
-                        help="Early stopping: epochs without val_acc improvement before stopping (default 7)")
+    parser.add_argument("--patience", type=int, default=10,
+                        help="Early stopping: epochs without val_acc improvement before stopping (default 10)")
     parser.add_argument("--data-dir", dest="data_dir", default=None,
                         help="Override image dataset directory (default: ml/data/images)")
     args = parser.parse_args()

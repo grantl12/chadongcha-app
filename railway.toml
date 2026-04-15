@@ -7,15 +7,16 @@
 # To create the worker services in Railway:
 #   railway service create sat-worker
 #   railway service create osm-seeder
-# Then set their start commands in the Railway dashboard (see below).
+# Start commands are set via startCommand in each service's toml file.
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
 
 [deploy]
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 

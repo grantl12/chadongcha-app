@@ -3,6 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile.seeder"
 
 [deploy]
+startCommand = "python workers/osm_seeder.py"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 

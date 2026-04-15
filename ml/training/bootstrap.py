@@ -69,6 +69,10 @@ GENERATION_CLASSES = [
     "Yamaha YZF-R1",
     "Harley-Davidson Sportster S",
     "BMW S1000RR K67",
+    # ── Vans ─────────────────────────────────────────────────────────────────
+    "Honda Odyssey RL6",
+    # ── EVs ──────────────────────────────────────────────────────────────────
+    "Tesla Model_S Plaid",
     # ── Background / negative class ─────────────────────────────────────────
     "_Background",
 ]

@@ -231,6 +231,22 @@ CLASS_QUERIES = {
         "Bugatti Chiron 2017 2018 photo",
         "Chiron supercar real photo",
     ],
+    # ── Vans ───────────────────────────────────────────────────────────────
+    "Honda Odyssey RL6": [
+        "Honda Odyssey 2023 exterior side view",
+        "Honda Odyssey 2024 2025 minivan photo",
+        "Honda Odyssey RL6 sixth generation street",
+        "Honda Odyssey white minivan 2023 real photo",
+        "Honda Odyssey 2025 front three quarter",
+    ],
+    # ── EVs ────────────────────────────────────────────────────────────────
+    "Tesla Model_S Plaid": [
+        "Tesla Model S 2021 exterior side view",
+        "Tesla Model S Plaid 2021 2022 photo",
+        "Tesla Model S refresh 2021 street photo",
+        "Tesla Model S Plaid white exterior",
+        "Tesla Model S 2022 2023 real photo side",
+    ],
     # ── Background / negative class ────────────────────────────────────────
     # Critical: without a "not a vehicle" class, softmax always forces a winner.
     # These images teach the model to output low confidence on non-vehicle inputs.

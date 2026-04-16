@@ -89,7 +89,7 @@ async def list_unknown(limit: int = 20, offset: int = 0):
         .execute()
     rows = res.data or []
     ids = [r["id"] for r in rows]
-    suggestion_counts = {}
+    suggestion_counts: dict[str, int] = {}
     if ids:
         sugg_res = db.table("id_suggestions").select("unknown_catch_id").in_("unknown_catch_id", ids).execute()
         for s in (sugg_res.data or []):
@@ -172,7 +172,7 @@ async def suggest_id(body: SuggestBody, authorization: str = Header(...)):
 def _maybe_auto_confirm(db, unknown_catch_id: str) -> None:
     QUORUM = 3
     sugg_res = db.table("id_suggestions").select("generation_id").eq("unknown_catch_id", unknown_catch_id).execute()
-    tally = {}
+    tally: dict[str, int] = {}
     for s in (sugg_res.data or []):
         gid = s["generation_id"]
         tally[gid] = tally.get(gid, 0) + 1

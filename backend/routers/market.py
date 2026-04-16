@@ -256,11 +256,13 @@ async def create_listing(body: CreateListingBody, authorization: str = Header(..
     p_sub = db.table("players").select("is_subscriber").eq("id", player_id).single().execute()
     is_subscriber = bool((p_sub.data or {}).get("is_subscriber", False))
     if not is_subscriber:
-        active_count = db.table("market_listings") \
-            .select("id", count="exact") \
-            .eq("seller_id", player_id) \
-            .eq("status", "active") \
+        active_count = (
+            db.table("market_listings")
+            .select("id", count="exact")  # type: ignore[arg-type]
+            .eq("seller_id", player_id)
+            .eq("status", "active")
             .execute()
+        )
         if (active_count.count or 0) >= FREE_LISTING_LIMIT:
             raise HTTPException(
                 status_code=402,

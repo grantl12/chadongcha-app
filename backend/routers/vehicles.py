@@ -54,7 +54,7 @@ async def get_generation(generation_id: str, authorization: Optional[str] = Head
             if auth_result and auth_result.user:
                 p = db.table("players").select("is_subscriber") \
                     .eq("id", auth_result.user.id).maybe_single().execute()
-                is_subscriber = bool((p.data or {}).get("is_subscriber", False))
+                is_subscriber = bool((p.data if p else None or {}).get("is_subscriber", False))
         except Exception:
             pass
 

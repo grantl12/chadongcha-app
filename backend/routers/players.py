@@ -235,7 +235,8 @@ async def set_home_location(
 
     # Fetch city name for the seeder
     player_data = db.table("players").select("home_city").eq("id", player_id).maybe_single().execute()
-    city_name = (player_data.data or {}).get("home_city") or f"Area_{round(body.home_lat, 2)}_{round(body.home_lon, 2)}"
+    _player_row = player_data.data if player_data else None
+    city_name = (_player_row or {}).get("home_city") or f"Area_{round(body.home_lat, 2)}_{round(body.home_lon, 2)}"
 
     db.table("players").update({
         "home_lat": body.home_lat,

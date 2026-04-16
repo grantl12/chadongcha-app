@@ -117,7 +117,7 @@ async def leave_crew(authorization: str = Header(...)):
     db.table("players").update({"crew_id": None}).eq("id", player_id).execute()
     
     # Optional: If crew has 0 members, delete it?
-    members = db.table("players").select("id", count="exact").eq("crew_id", crew_id).execute()
+    members = db.table("players").select("id", count="exact").eq("crew_id", crew_id).execute()  # type: ignore[arg-type]
     if members.count == 0:
         db.table("crews").delete().eq("id", crew_id).execute()
 

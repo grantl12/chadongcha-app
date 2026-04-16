@@ -142,7 +142,7 @@ async def ingest_catch(
     p_sub = db.table("players").select("is_subscriber").eq("id", player_id).single().execute()
     is_subscriber = bool((p_sub.data or {}).get("is_subscriber", False))
     if not is_subscriber:
-        garage_count = db.table("catches").select("id", count="exact").eq("player_id", player_id).execute()
+        garage_count = db.table("catches").select("id", count="exact").eq("player_id", player_id).execute()  # type: ignore[arg-type]
         if (garage_count.count or 0) >= FREE_GARAGE_LIMIT:
             raise HTTPException(
                 status_code=402,

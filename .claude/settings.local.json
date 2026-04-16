@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Read(//c/Users/grant/AppData/Local/Programs/Python//**)",
+      "Bash(py --list)",
+      "Bash(where python3 *)",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(npx expo *)",
+      "Bash(npx eas *)",
+      "Bash(where git *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('expo:', d.get\\('dependencies',{}\\).get\\('expo','?'\\)\\); print\\('eas-cli in devDeps:', 'eas-cli' in d.get\\('devDependencies',{}\\)\\)\")",
+      "Bash(py -3.10 -m venv .venv)",
+      "Bash(.venv/Scripts/pip install *)",
+      "Bash(npm install *)",
+      "Bash(timeout 10 .venv/Scripts/python -c \"import fastapi, uvicorn, supabase, boto3, sgp4; print\\('All imports OK'\\)\")",
+      "Bash(.venv/Scripts/python -m uvicorn main:app --reload)",
+      "Bash(cp *)",
+      "Bash(python3 *)",
+      "Bash(.venv310/Scripts/python -c \"import onnx2tf\")",
+      "Bash(.venv310/Scripts/pip show *)",
+      "Bash(.venv310/Scripts/pip install *)",
+      "Bash(.venv310/Scripts/onnx2tf --version)",
+      "Bash(.venv310/Scripts/onnx2tf -h)",
+      "Bash(.venv310/Scripts/onnx2tf -i export/vehicle_classifier.onnx -o export/tflite_out --non_verbose)",
+      "Bash(npx tsc *)",
+      "Bash(../backend/.venv/Scripts/python -m ruff check .)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(.venv/Scripts/mypy . --ignore-missing-imports --exclude workers/)",
+      "Bash(.venv/Scripts/ruff check *)",
+      "Bash(tasklist /fi \"imagename eq python.exe\" /fo list)",
+      "Bash(tasklist /fi \"imagename eq node.exe\" /fo list)"
+    ]
+  }
+}

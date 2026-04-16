@@ -225,12 +225,14 @@ async def ingest_catch(
 
     rarity = _get_rarity(db, body.generation_id)
     xp_earned, xp_reasons = compute_xp(
+        db, player_id,
         catch_type=body.catch_type,
         generation_id=body.generation_id,
         rarity_tier=rarity,
         is_personal_first=is_personal_first,
         session_same_gen_count=same_gen_count,
         orbital_boost=combined_boost,
+        road_segment_id=body.road_segment_id,
     )
     new_total_xp, level_up, new_level = apply_xp(db, player_id, xp_earned, catch_id, xp_reasons)
 

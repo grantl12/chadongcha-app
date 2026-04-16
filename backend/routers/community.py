@@ -174,7 +174,12 @@ def _maybe_auto_confirm(db, unknown_catch_id: str) -> None:
     catch_row = db.table("catches").select("player_id, catch_type").eq("id", catch_id).maybe_single().execute()
     gen_row = db.table("generations").select("rarity_tier").eq("id", winning_gen).maybe_single().execute()
     if catch_row and catch_row.data and gen_row and gen_row.data:
-        xp, reasons = compute_xp(catch_type=catch_row.data["catch_type"], generation_id=winning_gen, rarity_tier=gen_row.data["rarity_tier"])
+        xp, reasons = compute_xp(
+            db, catch_row.data["player_id"],
+            catch_type=catch_row.data["catch_type"],
+            generation_id=winning_gen,
+            rarity_tier=gen_row.data["rarity_tier"]
+        )
         if xp > 0:
             reasons.append("community_id_confirmed")
             apply_xp(db, catch_row.data["player_id"], xp, catch_id, reasons)

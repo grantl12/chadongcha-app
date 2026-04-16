@@ -1,0 +1,7 @@
+ultralytics
+torch
+torchvision
+timm
+coremltools
+onnx
+onnxruntime

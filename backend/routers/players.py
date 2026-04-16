@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from db import get_client
+from services.location_seeding_service import seed_location_if_needed
 
 router = APIRouter()
 
@@ -216,7 +217,11 @@ class HomeLocationRequest(BaseModel):
 
 
 @router.patch("/home-location")
-async def set_home_location(body: HomeLocationRequest, authorization: str = Header(...)):
+async def set_home_location(
+    body: HomeLocationRequest, 
+    background_tasks: BackgroundTasks,
+    authorization: str = Header(...)
+):
     """
     Store the player's home GPS coordinates (set once during onboarding,
     updatable from profile settings). Used by the satellite worker to filter
@@ -228,10 +233,17 @@ async def set_home_location(body: HomeLocationRequest, authorization: str = Head
     db = get_client()
     player_id = _resolve_player(db, authorization)
 
+    # Fetch city name for the seeder
+    player_data = db.table("players").select("home_city").eq("id", player_id).maybe_single().execute()
+    city_name = (player_data.data or {}).get("home_city") or f"Area_{round(body.home_lat, 2)}_{round(body.home_lon, 2)}"
+
     db.table("players").update({
         "home_lat": body.home_lat,
         "home_lon": body.home_lon,
     }).eq("id", player_id).execute()
+
+    # Trigger dynamic seeding in background
+    background_tasks.add_task(seed_location_if_needed, db, body.home_lat, body.home_lon, city_name)
 
     return {"ok": True}
 

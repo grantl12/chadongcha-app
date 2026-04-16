@@ -122,12 +122,15 @@ def get_orbital_boost(db, player_id: str) -> tuple[float, int] | None:
 
 
 def compute_xp(
+    db,
+    player_id: str,
     catch_type: str,
     generation_id: Optional[str],
     rarity_tier: Optional[str],
     is_personal_first: bool = False,
     session_same_gen_count: int = 0,
     orbital_boost: float = 1.0,
+    road_segment_id: Optional[str] = None,
 ) -> tuple[int, list[str]]:
     reasons: list[str] = []
     xp = 0
@@ -153,6 +156,35 @@ def compute_xp(
     if is_personal_first and xp > 0:
         xp = int(xp * PERSONAL_FIRST_MULTIPLIER)
         reasons.append("personal_first_catch")
+
+    # --- SOCIAL BONUSES ---
+    if xp > 0:
+        # 1. Home Turf Bonus (+5% if road owned by teammate)
+        if road_segment_id:
+            player_crew = db.table("players").select("crew_id").eq("id", player_id).maybe_single().execute()
+            crew_id = player_crew.data.get("crew_id") if player_crew and player_crew.data else None
+            
+            if crew_id:
+                road_king = db.table("road_kings").select("player_id").eq("segment_id", road_segment_id).maybe_single().execute()
+                king_id = road_king.data.get("player_id") if road_king and road_king.data else None
+                
+                if king_id:
+                    king_crew = db.table("players").select("crew_id").eq("id", king_id).maybe_single().execute()
+                    if king_crew and king_crew.data and king_crew.data.get("crew_id") == crew_id:
+                        xp = int(xp * 1.05)
+                        reasons.append("home_turf_bonus")
+
+        # 2. Subscriber Team Bonus (+2% per sub in crew, cap 10%)
+        player_crew = db.table("players").select("crew_id").eq("id", player_id).maybe_single().execute()
+        crew_id = player_crew.data.get("crew_id") if player_crew and player_crew.data else None
+        
+        if crew_id:
+            subs_res = db.table("players").select("id", count="exact").eq("crew_id", crew_id).eq("is_subscriber", True).execute()
+            sub_count = subs_res.count or 0
+            if sub_count > 0:
+                sub_bonus = min(0.10, sub_count * 0.02)
+                xp = int(xp * (1.0 + sub_bonus))
+                reasons.append(f"crew_sub_bonus_{int(sub_bonus*100)}pct")
 
     # Orbital Boost — applied after personal-first so both stack
     if orbital_boost > 1.0 and xp > 0 and catch_type != "space":

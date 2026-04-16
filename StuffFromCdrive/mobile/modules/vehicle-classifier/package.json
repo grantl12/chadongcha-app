@@ -1,0 +1,6 @@
+{
+  "name": "vehicle-classifier",
+  "version": "1.0.0",
+  "description": "CoreML vehicle classifier native module",
+  "main": "index.js"
+}

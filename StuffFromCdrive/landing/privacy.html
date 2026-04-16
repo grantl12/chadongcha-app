@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — ChaDongCha</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --red:  #e63946;
+      --dark: #0a0a0a;
+      --card: #111111;
+      --text: #ffffff;
+      --sub:  #888888;
+      --muted: #444444;
+    }
+    body {
+      background: var(--dark);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.7;
+    }
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 40px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .logo span { color: var(--red); }
+    nav a.back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+    nav a.back:hover { color: var(--text); }
+
+    .content {
+      max-width: 720px;
+      margin: 60px auto 100px;
+      padding: 0 24px;
+    }
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+    }
+    .updated {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 48px;
+    }
+
+    h2 {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--red);
+      margin: 40px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    p {
+      font-size: 14px;
+      color: var(--sub);
+      margin-bottom: 14px;
+    }
+    ul {
+      margin: 0 0 14px 0;
+      padding-left: 20px;
+    }
+    li {
+      font-size: 14px;
+      color: var(--sub);
+      margin-bottom: 6px;
+    }
+    a { color: var(--red); }
+    strong { color: var(--text); font-weight: 600; }
+
+    footer {
+      border-top: 1px solid #1a1a1a;
+      padding: 32px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    footer p { font-size: 12px; color: var(--muted); margin: 0; }
+    footer a { color: var(--muted); text-decoration: none; font-size: 12px; }
+    footer a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a class="logo" href="index.html">CHA<span>동</span>CHA</a>
+    <a class="back" href="index.html">← Back</a>
+  </nav>
+
+  <div class="content">
+    <p class="eyebrow">LEGAL</p>
+    <h1>PRIVACY POLICY</h1>
+    <p class="updated">Last updated: April 14, 2025</p>
+
+    <p>
+      ChaDongCha ("we," "us," or "our") is a mobile game that lets players identify,
+      collect, and compete around real vehicles spotted in the physical world. This
+      Privacy Policy explains what data we collect, why we collect it, and how it is
+      used. By using the app you agree to the practices described here.
+    </p>
+
+    <h2>1. INFORMATION WE COLLECT</h2>
+    <p><strong>Account data.</strong> When you sign up we collect a username and an email address (via Supabase Auth). We do not collect your real name.</p>
+    <p><strong>Location data.</strong> We use GPS to assign catches to road segments and to compute satellite pass times relevant to your area. Your precise coordinates are never stored permanently — we store only a coarse home city/district you set during onboarding, and a home GPS coordinate you provide for satellite notifications.</p>
+    <p><strong>Camera data.</strong> Vehicle classification runs entirely on-device using a locally stored machine-learning model. Camera frames are never transmitted to our servers. If you opt into scan contribution (off by default), still-image crops may be uploaded anonymously to improve model accuracy — these images are stripped of metadata before upload.</p>
+    <p><strong>Catch data.</strong> When a vehicle is caught we record the vehicle generation, catch type, confidence score, fuzzy location (city/district), and timestamp. This data is used for leaderboards, territory tracking, and your personal garage.</p>
+    <p><strong>License plate hashes.</strong> If you opt into the Spotter feature you may register a SHA-256 hash of your own license plate. The raw plate number is computed and hashed entirely on your device and never transmitted. We store only the hash.</p>
+    <p><strong>Push notification token.</strong> If you grant notification permission we store your Expo push token to send satellite pass alerts and game events. You can revoke this at any time in your device settings.</p>
+
+    <h2>2. REDDIT CONTENT</h2>
+    <p>
+      ChaDongCha optionally surfaces publicly posted photos from Reddit
+      (specifically r/whatisthiscar) as part of an in-app vehicle identification
+      mechanic. This content is fetched through the Reddit API in <strong>read-only</strong> mode.
+    </p>
+    <ul>
+      <li>We display images with attribution to the original Reddit poster.</li>
+      <li>We do not collect Reddit account information from players.</li>
+      <li>We do not post, vote, comment, or take any write action on Reddit.</li>
+      <li>Reddit content is used solely to power the community identification feature and may contribute to training data for our on-device vehicle classifier.</li>
+      <li>If you are a Reddit user and would like a post removed from our dataset, contact us at the address below.</li>
+    </ul>
+
+    <h2>3. HOW WE USE YOUR DATA</h2>
+    <ul>
+      <li>Operate the game — catches, XP, leaderboards, territory.</li>
+      <li>Send you satellite pass notifications and game alerts.</li>
+      <li>Improve our on-device vehicle classifier (only with opt-in scan contribution).</li>
+      <li>Detect abuse (e.g., duplicate catch spoofing) via confidence scores and hashed plate deduplication.</li>
+    </ul>
+    <p>We do not sell your data. We do not use your data for advertising.</p>
+
+    <h2>4. DATA SHARING</h2>
+    <p>We use the following third-party services:</p>
+    <ul>
+      <li><strong>Supabase</strong> — authentication and database (EU/US data centers)</li>
+      <li><strong>Cloudflare R2</strong> — opt-in scan photo storage</li>
+      <li><strong>Expo</strong> — push notification delivery</li>
+      <li><strong>Railway</strong> — backend API hosting</li>
+    </ul>
+    <p>Each provider operates under their own privacy policy. We do not share personally identifiable information with any other third party.</p>
+
+    <h2>5. DATA RETENTION</h2>
+    <p>Your account data and catch history are retained while your account is active. You may delete your account at any time from the Profile screen, which permanently removes all associated data within 30 days.</p>
+
+    <h2>6. CHILDREN'S PRIVACY</h2>
+    <p>ChaDongCha is not directed at children under 13. We do not knowingly collect personal information from children under 13. If you believe a child has provided us data, contact us and we will delete it promptly.</p>
+
+    <h2>7. YOUR RIGHTS</h2>
+    <p>Depending on your location you may have the right to access, correct, or delete the personal data we hold about you. To make a request, contact us at the email below.</p>
+
+    <h2>8. CHANGES TO THIS POLICY</h2>
+    <p>We may update this policy from time to time. The "last updated" date at the top of this page reflects the most recent revision. Continued use of the app after changes constitutes acceptance.</p>
+
+    <h2>9. CONTACT</h2>
+    <p>Questions or data requests: <a href="mailto:contact@chadongcha.app">contact@chadongcha.app</a></p>
+  </div>
+
+  <footer>
+    <p>&copy; 2025 ChaDongCha. All rights reserved.</p>
+    <a href="index.html">← Back to Home</a>
+  </footer>
+
+</body>
+</html>

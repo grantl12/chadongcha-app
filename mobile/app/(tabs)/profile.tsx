@@ -393,6 +393,9 @@ export default function ProfileScreen() {
 
       {/* Actions */}
       <View style={styles.actions}>
+        <Pressable style={styles.actionButton} onPress={() => router.push('/crew')}>
+          <Text style={styles.actionText}>MY TEAM</Text>
+        </Pressable>
         <Pressable style={styles.actionButton} onPress={() => router.push('/leaderboard')}>
           <Text style={styles.actionText}>LEADERBOARD</Text>
         </Pressable>

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-lint:
+    name: Backend — lint + type check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install ruff mypy -r requirements.txt
+      - run: ruff check .
+      - run: mypy . --ignore-missing-imports --exclude workers/
+
+  mobile-ts:
+    name: Mobile — TypeScript check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      # Generate Expo Router typed-route declarations before tsc runs.
+      # Without this, .expo/types/router.d.ts is missing (it's gitignored)
+      # and the TS check fails even though expo/tsconfig.base sets skipLibCheck.
+      - name: Generate Expo Router types
+        run: npx expo export --dump-sourcemap --platform web 2>/dev/null || true
+      - run: npx tsc --noEmit

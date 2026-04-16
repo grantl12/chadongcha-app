@@ -1,0 +1,8 @@
+ml/data/
+ml/models/
+ml/ml/
+ml/train_cha.py
+__pycache__/
+.env
+.vscode/
+*.pyc

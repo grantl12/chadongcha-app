@@ -263,8 +263,7 @@ def _compute_passes_for_sat(
 
 async def compute_passes() -> None:
     """
-    For each satellite × each seed city, compute overhead passes.
-    Clears stale passes before inserting new ones.
+    For each satellite × each active player region, compute overhead passes.
     """
     db = get_client()
     now = datetime.now(timezone.utc)
@@ -273,47 +272,45 @@ async def compute_passes() -> None:
     # Remove expired passes
     db.table("catchable_objects").delete().lt("pass_end", now.isoformat()).execute()
 
-    # Load satellites with valid TLEs
-    rows = (
-        db.table("space_objects")
-        .select("id, name, tle_line1, tle_line2")
-        .eq("active", True)
-        .not_.is_("tle_line1", "null")
-        .execute()
-    )
-    if not rows.data:
-        log.warning("No satellites with TLEs in DB — run TLE refresh first")
-        return
+    # Load satellites
+    rows = db.table("space_objects").select("id, name, tle_line1, tle_line2").eq("active", True).not_.is_("tle_line1", "null").execute()
+    if not rows.data: return
+
+    # Fetch unique player home locations (rounded to 1 decimal for clustering ~10km)
+    # Note: Postgrest doesn't support distinct on rounded values easily, so we fetch and dedupe in python
+    players_res = db.table("players").select("home_lat, home_lon").not_.is_("home_lat", "null").execute()
+    
+    unique_regions = set()
+    for p in (players_res.data or []):
+        unique_regions.add((round(p["home_lat"], 1), round(p["home_lon"], 1)))
+    
+    # Fallback to seed locations if no players
+    locations = list(unique_regions) if unique_regions else [(lat, lon) for lat, lon, city in SEED_LOCATIONS]
 
     inserted = 0
     for row in rows.data:
         try:
             sat = Satrec.twoline2rv(row["tle_line1"], row["tle_line2"])
-        except Exception as exc:
-            log.warning("Bad TLE for %s: %s", row["name"], exc)
-            continue
+        except Exception: continue
 
-        for lat, lon, city in SEED_LOCATIONS:
+        for lat, lon in locations:
             try:
                 passes = _compute_passes_for_sat(sat, lat, lon, now, window_end)
                 for p in passes:
-                    db.table("catchable_objects").upsert(
-                        {
-                            "space_object_id":  row["id"],
-                            "pass_start":       p["pass_start"],
-                            "pass_end":         p["pass_end"],
-                            "max_elevation":    p["max_elevation"],
-                            "region_lat":       lat,
-                            "region_lon":       lon,
-                            "region_radius_km": 500,
-                        },
-                        on_conflict="space_object_id,pass_start",
-                    ).execute()
+                    db.table("catchable_objects").upsert({
+                        "space_object_id":  row["id"],
+                        "pass_start":       p["pass_start"],
+                        "pass_end":         p["pass_end"],
+                        "max_elevation":    p["max_elevation"],
+                        "region_lat":       lat,
+                        "region_lon":       lon,
+                        "region_radius_km": 500,
+                    }, on_conflict="space_object_id,pass_start").execute()
                     inserted += 1
             except Exception as exc:
-                log.warning("Pass compute error %s @ %s: %s", row["name"], city, exc)
+                log.warning("Pass compute error: %s", exc)
 
-    log.info("Pass computation complete — %d windows inserted/updated", inserted)
+    log.info("Pass computation complete — %d windows updated for %d regions", inserted, len(locations))
 
 
 # ---------------------------------------------------------------------------

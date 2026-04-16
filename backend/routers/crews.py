@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from db import get_client
 
 router = APIRouter()
@@ -36,8 +36,12 @@ async def create_crew(body: CreateCrewRequest, authorization: str = Header(...))
     db = get_client()
     player_id = _resolve_player(db, authorization)
 
+    # Require Pro subscription to create a crew
+    player = db.table("players").select("crew_id, is_subscriber").eq("id", player_id).maybe_single().execute()
+    if not (player and player.data and player.data.get("is_subscriber")):
+        raise HTTPException(status_code=402, detail="Creating a crew requires a Pro subscription.")
+
     # Check if player is already in a crew
-    player = db.table("players").select("crew_id").eq("id", player_id).maybe_single().execute()
     if player and player.data and player.data.get("crew_id"):
         raise HTTPException(status_code=400, detail="You are already in a crew. Leave your current crew first.")
 

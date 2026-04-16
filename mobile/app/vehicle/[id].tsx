@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { apiClient } from '@/api/client';
 import { useCatchStore } from '@/stores/catchStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { PaywallModal } from '@/components/PaywallModal';
 
 type FirstFinder = {
   region_scope: string;
@@ -20,6 +21,17 @@ type Variant = {
   visually_distinct: boolean;
 };
 
+type Telemetry = {
+  hp_min: number | null;
+  hp_max: number | null;
+  torque_nm_min: number | null;
+  torque_nm_max: number | null;
+  weight_kg_min: number | null;
+  weight_kg_max: number | null;
+  msrp_usd_min: number | null;
+  msrp_usd_max: number | null;
+};
+
 type GenerationDetail = {
   id: string;
   common_name: string;
@@ -32,6 +44,8 @@ type GenerationDetail = {
   global_catch_count: number;
   first_finders: FirstFinder[];
   variants: Variant[];
+  telemetry: Telemetry | null;
+  telemetry_locked: boolean;
   models: {
     name: string;
     class: string;
@@ -94,9 +108,10 @@ function timeAgo(iso: string): string {
 }
 
 export default function VehicleEntryScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const userId  = usePlayerStore(s => s.userId);
-  const catches = useCatchStore(s => s.catches);
+  const { id }         = useLocalSearchParams<{ id: string }>();
+  const userId         = usePlayerStore(s => s.userId);
+  const catches        = useCatchStore(s => s.catches);
+  const [paywallVisible, setPaywallVisible] = useState(false);
 
   // Personal stats from local store — no network call needed
   const personalCatches = useMemo(
@@ -200,6 +215,28 @@ export default function VehicleEntryScreen() {
         <StatBox label="CAUGHT"     value={`${data.global_catch_count}×`} accent={accentColor} />
       </View>
 
+      {/* Advanced Telemetry */}
+      <Section title="ADVANCED TELEMETRY">
+        {data.telemetry_locked ? (
+          <Pressable style={styles.telemLock} onPress={() => setPaywallVisible(true)}>
+            <Text style={styles.telemLockIcon}>🔒</Text>
+            <View>
+              <Text style={styles.telemLockTitle}>PRO FEATURE</Text>
+              <Text style={styles.telemLockSub}>HP · Torque · Weight · MSRP — tap to unlock</Text>
+            </View>
+          </Pressable>
+        ) : data.telemetry ? (
+          <View style={styles.telemGrid}>
+            <TelemBox label="HP" lo={data.telemetry.hp_min} hi={data.telemetry.hp_max} unit="hp" accent={accentColor} />
+            <TelemBox label="TORQUE" lo={data.telemetry.torque_nm_min} hi={data.telemetry.torque_nm_max} unit="Nm" accent={accentColor} />
+            <TelemBox label="WEIGHT" lo={data.telemetry.weight_kg_min} hi={data.telemetry.weight_kg_max} unit="kg" accent={accentColor} />
+            <TelemBox label="MSRP" lo={data.telemetry.msrp_usd_min} hi={data.telemetry.msrp_usd_max} unit="USD" accent={accentColor} isCurrency />
+          </View>
+        ) : (
+          <Text style={styles.ffEmpty}>No telemetry data available yet.</Text>
+        )}
+      </Section>
+
       {/* Recent sightings */}
       {recentData && recentData.length > 0 && (
         <Section title="RECENT SIGHTINGS">
@@ -257,7 +294,29 @@ export default function VehicleEntryScreen() {
           <Text style={styles.ffEmpty}>No first finders yet — be the first.</Text>
         )}
       </Section>
+
+      <PaywallModal
+        visible={paywallVisible}
+        onClose={() => setPaywallVisible(false)}
+        feature="Advanced Telemetry"
+        description="Unlock HP, torque, weight, and MSRP data for every vehicle in your garage."
+      />
     </ScrollView>
+  );
+}
+
+function TelemBox({ label, lo, hi, unit, accent, isCurrency }: {
+  label: string; lo: number | null; hi: number | null;
+  unit: string; accent: string; isCurrency?: boolean;
+}) {
+  const fmt = (v: number) => isCurrency ? `$${v.toLocaleString()}` : v.toLocaleString();
+  const value = lo && hi && lo !== hi ? `${fmt(lo)}–${fmt(hi)}` : lo ? fmt(lo) : '—';
+  return (
+    <View style={styles.telemBox}>
+      <Text style={styles.telemLabel}>{label}</Text>
+      <Text style={[styles.telemValue, { color: accent }]}>{value}</Text>
+      {(lo || hi) ? <Text style={styles.telemUnit}>{unit}</Text> : null}
+    </View>
   );
 }
 
@@ -326,6 +385,15 @@ const styles = StyleSheet.create({
   variantName:        { color: '#fff', fontSize: 14 },
   variantTag:         { color: '#444', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
 
+  telemGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  telemBox:           { flex: 1, minWidth: '45%', backgroundColor: '#111', borderRadius: 10, padding: 14, gap: 2 },
+  telemLabel:         { color: '#444', fontSize: 10, letterSpacing: 2, fontWeight: '700' },
+  telemValue:         { fontSize: 18, fontWeight: '900' },
+  telemUnit:          { color: '#333', fontSize: 10, fontWeight: '600' },
+  telemLock:          { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#111', borderRadius: 10, padding: 16, borderWidth: 1, borderColor: '#e6394633' },
+  telemLockIcon:      { fontSize: 20 },
+  telemLockTitle:     { color: '#e63946', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  telemLockSub:       { color: '#444', fontSize: 12, marginTop: 2 },
   ffRow:              { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111', gap: 12 },
   ffEmoji:            { fontSize: 20, width: 28, textAlign: 'center' },
   ffBody:             { flex: 1, gap: 2 },

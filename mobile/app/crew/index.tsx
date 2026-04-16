@@ -8,11 +8,14 @@ import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { crewApi, Crew, CrewMember } from '@/src/api/crews';
 import { usePlayerStore } from '@/stores/playerStore';
+import { PaywallModal } from '@/components/PaywallModal';
 
 export default function CrewScreen() {
-  const queryClient = useQueryClient();
-  const crewId      = usePlayerStore(s => s.crewId);
+  const queryClient  = useQueryClient();
+  const crewId       = usePlayerStore(s => s.crewId);
+  const isSubscriber = usePlayerStore(s => s.isSubscriber);
   const [refreshing, setRefreshing] = useState(false);
+  const [paywallVisible, setPaywallVisible] = useState(false);
 
   const { data: crew, isLoading: isLoadingCrew, refetch: refetchCrew } = useQuery({
     queryKey: ['crew', crewId],
@@ -60,10 +63,23 @@ export default function CrewScreen() {
             <Text style={styles.backText}>←</Text>
           </Pressable>
           <Text style={styles.title}>TEAMS</Text>
-          <Pressable style={styles.createBtn} onPress={() => router.push('/crew/create')}>
-            <Text style={styles.createBtnText}>NEW</Text>
+          <Pressable
+            style={[styles.createBtn, !isSubscriber && styles.createBtnLocked]}
+            onPress={() => {
+              if (!isSubscriber) { setPaywallVisible(true); return; }
+              router.push('/crew/create');
+            }}
+          >
+            <Text style={styles.createBtnText}>{isSubscriber ? 'NEW' : '🔒'}</Text>
           </Pressable>
         </View>
+
+        <PaywallModal
+          visible={paywallVisible}
+          onClose={() => setPaywallVisible(false)}
+          feature="Create a Crew"
+          description="Pro subscribers can found crews, customize colors, and lead their team on the touge."
+        />
 
         <FlatList
           data={availableCrews}
@@ -155,8 +171,9 @@ const styles = StyleSheet.create({
   backBtn:        { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   backText:       { color: '#555', fontSize: 22 },
   title:          { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 6 },
-  createBtn:      { backgroundColor: '#e63946', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 },
-  createBtnText:  { color: '#fff', fontSize: 10, fontWeight: '900' },
+  createBtn:        { backgroundColor: '#e63946', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 },
+  createBtnLocked:  { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333' },
+  createBtnText:    { color: '#fff', fontSize: 10, fontWeight: '900' },
 
   list:           { padding: 20 },
   crewCard:       { backgroundColor: '#141414', borderRadius: 8, marginBottom: 12, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: '#222' },

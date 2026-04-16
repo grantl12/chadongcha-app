@@ -6,7 +6,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { crewApi } from '@/src/api/crews';
+import { crewApi } from '../../src/api/crews';
 
 const COLORS = ['#e63946', '#4a9eff', '#a855f7', '#f59e0b', '#22c55e', '#ffffff'];
 

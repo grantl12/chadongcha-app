@@ -24,6 +24,9 @@ router = APIRouter()
 LISTING_DURATION_DAYS = 7
 CREDIT_REWARD_PER_CATCH = 10   # credits awarded per catch (applied by catches router)
 
+FREE_LISTING_LIMIT  = 3     # max concurrent active listings for non-subscribers
+MARKET_FEE_RATE_FREE = 0.05  # 5% platform fee deducted from seller payout (free accounts)
+
 VALID_RARITIES = {"common", "uncommon", "rare", "epic", "legendary"}
 
 # Credits paid by the wholesaler per rarity tier
@@ -249,6 +252,21 @@ async def create_listing(body: CreateListingBody, authorization: str = Header(..
     if not catch or not catch.data:
         raise HTTPException(status_code=404, detail="Catch not found or not yours")
 
+    # Listing cap for free accounts
+    p_sub = db.table("players").select("is_subscriber").eq("id", player_id).single().execute()
+    is_subscriber = bool((p_sub.data or {}).get("is_subscriber", False))
+    if not is_subscriber:
+        active_count = db.table("market_listings") \
+            .select("id", count="exact") \
+            .eq("seller_id", player_id) \
+            .eq("status", "active") \
+            .execute()
+        if (active_count.count or 0) >= FREE_LISTING_LIMIT:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Free accounts are limited to {FREE_LISTING_LIMIT} active listings. Upgrade to Pro for more.",
+            )
+
     # Prevent double-listing
     existing = db.table("market_listings") \
         .select("id") \
@@ -380,10 +398,16 @@ async def accept_bid(listing_id: str, body: AcceptBidBody, authorization: str = 
     # Execute transfer atomically via individual updates
     # (Supabase python client doesn't support true transactions; RPC would be ideal for prod)
 
+    # 5% market fee for non-subscriber sellers
+    p_sub = db.table("players").select("is_subscriber").eq("id", seller_id).single().execute()
+    seller_is_sub = bool((p_sub.data or {}).get("is_subscriber", False))
+    fee = 0 if seller_is_sub else int(sale_price * MARKET_FEE_RATE_FREE)
+    seller_payout = sale_price - fee
+
     # Deduct from buyer
     db.rpc("decrement_credits", {"p_player_id": buyer_id, "p_amount": sale_price}).execute()
-    # Add to seller
-    db.rpc("increment_credits", {"p_player_id": seller_id, "p_amount": sale_price}).execute()
+    # Add to seller (minus fee)
+    db.rpc("increment_credits", {"p_player_id": seller_id, "p_amount": seller_payout}).execute()
 
     # Transfer catch ownership
     db.table("catches").update({"player_id": buyer_id}).eq("id", listing.data["catch_id"]).execute()
@@ -397,8 +421,8 @@ async def accept_bid(listing_id: str, body: AcceptBidBody, authorization: str = 
 
     # Log credit events
     db.table("credit_events").insert([
-        {"player_id": buyer_id,  "delta": -sale_price, "reason": "market_purchase", "ref_id": listing_id},
-        {"player_id": seller_id, "delta":  sale_price, "reason": "market_sale",     "ref_id": listing_id},
+        {"player_id": buyer_id,  "delta": -sale_price,   "reason": "market_purchase", "ref_id": listing_id},
+        {"player_id": seller_id, "delta":  seller_payout, "reason": "market_sale",     "ref_id": listing_id},
     ]).execute()
 
     # Activity feed — market sale event
@@ -410,7 +434,7 @@ async def accept_bid(listing_id: str, body: AcceptBidBody, authorization: str = 
         "credits":      sale_price,
     })
 
-    return {"ok": True, "sale_price": sale_price}
+    return {"ok": True, "sale_price": sale_price, "seller_payout": seller_payout, "fee": fee}
 
 
 @router.post("/sell")

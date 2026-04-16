@@ -7,7 +7,7 @@ import math
 import sys
 import os
 import time
-from typing import Optional
+
 
 import httpx
 

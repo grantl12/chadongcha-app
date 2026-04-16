@@ -33,6 +33,7 @@ type PlayerStore = {
   scanBoostExpires: string | null;
   idHints: number;
   crewId: string | null;
+  isSubscriber: boolean;
   storedBoosts: StoredBoost[];
   pendingBoostDecision: PendingBoostDecision | null;
 
@@ -44,6 +45,7 @@ type PlayerStore = {
     scanBoostExpires?: string | null;
     idHints?: number;
     crewId?: string | null;
+    isSubscriber?: boolean;
   }) => void;
   applyXp: (delta: number, newLevel?: number) => void;
   applyCredits: (delta: number) => void;
@@ -76,6 +78,7 @@ export const usePlayerStore = create<PlayerStore>()(
       scanBoostExpires: null,
       idHints: 0,
       crewId: null,
+      isSubscriber: false,
       storedBoosts: [],
       pendingBoostDecision: null,
 
@@ -87,13 +90,14 @@ export const usePlayerStore = create<PlayerStore>()(
         set({ xp, level });
       },
 
-      setFullProfile({ xp, level, credits, xpBoostExpires, scanBoostExpires, idHints, crewId }) {
+      setFullProfile({ xp, level, credits, xpBoostExpires, scanBoostExpires, idHints, crewId, isSubscriber }) {
         set({
           xp, level, credits,
           xpBoostExpires:   xpBoostExpires  ?? null,
           scanBoostExpires: scanBoostExpires ?? null,
           idHints:          idHints          ?? 0,
           crewId:           crewId           !== undefined ? crewId : null,
+          isSubscriber:     isSubscriber     ?? false,
         });
       },
 
@@ -149,6 +153,7 @@ export const usePlayerStore = create<PlayerStore>()(
           xp: 0, level: 1, credits: 0,
           orbitalBoostExpires: null, xpBoostExpires: null,
           scanBoostExpires: null, idHints: 0,
+          crewId: null, isSubscriber: false,
           storedBoosts: [], pendingBoostDecision: null,
         });
       },

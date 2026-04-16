@@ -190,6 +190,8 @@ export default function ProfileScreen() {
           xpBoostExpires:   profile.xp_boost_expires,
           scanBoostExpires: profile.scan_boost_expires,
           idHints:          profile.id_hints ?? 0,
+          crewId:           profile.crew_id ?? null,
+          isSubscriber:     profile.is_subscriber ?? false,
         });
       })
       .catch(() => {});

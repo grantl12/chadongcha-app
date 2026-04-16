@@ -4,6 +4,7 @@ Matches the successful logic from ml/training/scrape_images.py.
 Saves to ml/data/id_game/ and generates SQL for R2 migration.
 """
 
+import hashlib
 import os
 import sys
 import uuid
@@ -14,7 +15,9 @@ from io import BytesIO
 from pathlib import Path
 from typing import List, Optional
 
+import boto3
 import requests
+from botocore.config import Config
 from PIL import Image
 from duckduckgo_search import DDGS
 from dotenv import load_dotenv
@@ -35,6 +38,54 @@ MIN_IMAGE_SIZE = 500
 MAX_IMAGE_SIZE = 1024
 R2_PUBLIC_BASE_URL = os.getenv("R2_PUBLIC_URL", "https://assets.chadongcha.app")
 R2_PREFIX = "id_game"
+
+# R2 upload — optional. Falls back to local-only if credentials are missing.
+_r2 = None
+
+def _get_r2():
+    global _r2
+    if _r2 is None:
+        account_id = os.getenv("R2_ACCOUNT_ID", "")
+        key_id     = os.getenv("R2_ACCESS_KEY_ID", "")
+        secret     = os.getenv("R2_SECRET_ACCESS_KEY", "")
+        if account_id and key_id and secret:
+            try:
+                _r2 = boto3.client(
+                    "s3",
+                    endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+                    aws_access_key_id=key_id,
+                    aws_secret_access_key=secret,
+                    region_name="auto",
+                    config=Config(signature_version="s3v4"),
+                )
+                log.info("R2 client initialised — images will be uploaded directly.")
+            except Exception as e:
+                log.warning(f"R2 client init failed ({e}). Saving locally only.")
+        else:
+            log.info("R2 credentials not set — saving locally. Upload manually afterwards.")
+    return _r2
+
+
+def image_hash(data: bytes) -> str:
+    return hashlib.md5(data).hexdigest()
+
+
+def upload_to_r2(data: bytes, key: str) -> bool:
+    """Upload bytes to R2. Returns True on success."""
+    client = _get_r2()
+    if not client:
+        return False
+    try:
+        client.put_object(
+            Bucket="chadongcha-assets",
+            Key=key,
+            Body=data,
+            ContentType="image/jpeg",
+        )
+        return True
+    except Exception as e:
+        log.warning(f"R2 upload failed for {key}: {e}")
+        return False
 
 # (Car list same as V3)
 ALL_CARS = [
@@ -134,7 +185,7 @@ def scrape_car(ddgs, car: dict, seen_hashes: set, sql_f) -> int:
     ]
     
     saved = 0
-    log.info(f"%-25s  need {IMAGES_PER_CAR} images…", label)
+    log.info("%-25s  need %d images...", label, IMAGES_PER_CAR)
 
     for query in queries:
         if saved >= IMAGES_PER_CAR: break
@@ -178,19 +229,29 @@ def scrape_car(ddgs, car: dict, seen_hashes: set, sql_f) -> int:
             if h in seen_hashes: continue
             seen_hashes.add(h)
 
-            car_uuid = str(uuid.uuid4())
-            save_path = DATA_DIR / f"{car_uuid}.jpg"
-            save_path.write_bytes(raw)
-            
-            # Write SQL
-            r2_url = f"{R2_PUBLIC_BASE_URL}/{R2_PREFIX}/{car_uuid}.jpg"
-            sql = f"insert into id_game_queue (image_url, author_username, answer_class, answer_label, body_style, source, status) values ('{r2_url}', 'Archive', '{cls}', '{label}', '{body}', 'scraped', 'active');
-"
+            car_uuid  = str(uuid.uuid4())
+            r2_key    = f"{R2_PREFIX}/{car_uuid}.jpg"
+            r2_url    = f"{R2_PUBLIC_BASE_URL}/{r2_key}"
+            uploaded  = upload_to_r2(raw, r2_key)
+
+            if not uploaded:
+                # Fall back to local save; user can manually upload to R2 later
+                save_path = DATA_DIR / f"{car_uuid}.jpg"
+                save_path.write_bytes(raw)
+                log.info(f"  [{saved+1}/{IMAGES_PER_CAR}] saved locally: {car_uuid}.jpg")
+            else:
+                log.info(f"  [{saved+1}/{IMAGES_PER_CAR}] uploaded to R2: {r2_key}")
+
+            # SQL always uses the R2 URL (local files need manual upload before inserting)
+            sql = (
+                f"insert into id_game_queue "
+                f"(image_url, author_username, answer_class, answer_label, body_style, source, status) "
+                f"values ('{r2_url}', 'Archive', '{cls}', '{label}', '{body}', 'scraped', 'active');\n"
+            )
             sql_f.write(sql)
             sql_f.flush()
 
             saved += 1
-            log.info(f"  [{saved}/{IMAGES_PER_CAR}] saved {car_uuid}.jpg")
             
     return saved
 

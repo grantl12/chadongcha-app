@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Header
 from typing import Optional
 from db import get_client
 
@@ -22,7 +22,7 @@ async def list_models(make_id: Optional[str] = Query(None)):
 
 
 @router.get("/generations/{generation_id}")
-async def get_generation(generation_id: str):
+async def get_generation(generation_id: str, authorization: Optional[str] = Header(None)):
     db = get_client()
     result = db.table("generations").select("*, models(*, makes(*)), variants(*)") \
         .eq("id", generation_id).maybe_single().execute()
@@ -44,6 +44,28 @@ async def get_generation(generation_id: str):
     count_res = db.table("catches").select("id", count=CountMethod.exact) \
         .eq("generation_id", generation_id).execute()
     data["global_catch_count"] = count_res.count or 0
+
+    # Advanced Telemetry — returned only for Pro subscribers
+    is_subscriber = False
+    if authorization:
+        try:
+            token = authorization.replace("Bearer ", "")
+            auth_result = db.auth.get_user(token)
+            if auth_result and auth_result.user:
+                p = db.table("players").select("is_subscriber") \
+                    .eq("id", auth_result.user.id).maybe_single().execute()
+                is_subscriber = bool((p.data or {}).get("is_subscriber", False))
+        except Exception:
+            pass
+
+    telem = db.table("generation_telemetry").select("*") \
+        .eq("generation_id", generation_id).maybe_single().execute()
+    data["telemetry"] = (
+        {k: v for k, v in telem.data.items() if k not in ("generation_id", "updated_at")}
+        if is_subscriber and telem and telem.data
+        else None
+    )
+    data["telemetry_locked"] = not is_subscriber
 
     return data
 

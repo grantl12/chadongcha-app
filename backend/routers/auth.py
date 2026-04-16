@@ -96,7 +96,7 @@ async def me_info(authorization: str = Header(...)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     result = db.table("players") \
-        .select("username, xp, level, credits, xp_boost_expires, scan_boost_expires, id_hints") \
+        .select("username, xp, level, credits, xp_boost_expires, scan_boost_expires, id_hints, crew_id, is_subscriber") \
         .eq("id", user_id).single().execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Player not found")
@@ -111,6 +111,8 @@ async def me_info(authorization: str = Header(...)):
         "xp_boost_expires":   d.get("xp_boost_expires"),
         "scan_boost_expires": d.get("scan_boost_expires"),
         "id_hints":           d.get("id_hints", 0),
+        "crew_id":            d.get("crew_id"),
+        "is_subscriber":      d.get("is_subscriber", False),
     }
 
 

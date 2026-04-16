@@ -11,6 +11,9 @@ import { usePlayerStore, type StoredBoost, MAX_STORED_BOOSTS } from '@/stores/pl
 import { useMarketStore, type MarketListing } from '@/stores/marketStore';
 import { GarageCarousel } from '@/components/GarageCarousel';
 import { computeBadges, type Badge, type BadgeCategory } from '@/utils/badges';
+import { PaywallModal } from '@/components/PaywallModal';
+
+const FREE_GARAGE_LIMIT = 75;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -731,16 +734,20 @@ function ShopTab() {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GarageScreen() {
-  const catches    = useCatchStore(s => s.catches);
-  const removeCatch = useCatchStore(s => s.removeCatch);
-  const syncError  = useCatchStore(s => s.syncError);
-  const clearError = useCatchStore(s => s.clearSyncError);
-  const credits    = usePlayerStore(s => s.credits);
-  const setCredits = usePlayerStore(s => s.setCredits);
+  const catches       = useCatchStore(s => s.catches);
+  const removeCatch   = useCatchStore(s => s.removeCatch);
+  const syncError     = useCatchStore(s => s.syncError);
+  const clearError    = useCatchStore(s => s.clearSyncError);
+  const credits       = usePlayerStore(s => s.credits);
+  const setCredits    = usePlayerStore(s => s.setCredits);
+  const isSubscriber  = usePlayerStore(s => s.isSubscriber);
   const [activeTab, setActiveTab] = useState<GarageTab>('catches');
   const [sellTarget, setSellTarget] = useState<CatchRecord | null>(null);
   const [selling, setSelling] = useState(false);
   const [catchViewMode, setCatchViewMode] = useState<CatchViewMode>('3d');
+  const [paywallVisible, setPaywallVisible] = useState(false);
+
+  const garageFull = !isSubscriber && catches.length >= FREE_GARAGE_LIMIT;
 
   const pendingCount = catches.filter(c => !c.synced).length;
   const earnedCount  = useMemo(() => computeBadges(catches).filter(b => b.earned).length, [catches]);
@@ -763,11 +770,27 @@ export default function GarageScreen() {
         </View>
       )}
 
+      {/* Garage cap banner */}
+      {garageFull && (
+        <Pressable style={styles.garageCap} onPress={() => setPaywallVisible(true)}>
+          <Text style={styles.garageCapText}>GARAGE FULL · {catches.length}/{FREE_GARAGE_LIMIT} · UPGRADE TO PRO →</Text>
+        </Pressable>
+      )}
+      {!isSubscriber && !garageFull && catches.length >= FREE_GARAGE_LIMIT - 10 && (
+        <Pressable style={styles.garageCapWarn} onPress={() => setPaywallVisible(true)}>
+          <Text style={styles.garageCapWarnText}>
+            {FREE_GARAGE_LIMIT - catches.length} garage slots remaining · Upgrade for unlimited
+          </Text>
+        </Pressable>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>GARAGE</Text>
         <View style={styles.headerMeta}>
-          <Text style={styles.metaLabel}>{catches.length} CAUGHT</Text>
+          <Text style={styles.metaLabel}>
+            {catches.length}{!isSubscriber ? `/${FREE_GARAGE_LIMIT}` : ''} CAUGHT
+          </Text>
           <Text style={styles.metaDivider}>·</Text>
           <Text style={styles.metaLabel}>{earnedCount} BADGES</Text>
           <Text style={styles.metaDivider}>·</Text>
@@ -905,6 +928,13 @@ export default function GarageScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      <PaywallModal
+        visible={paywallVisible}
+        onClose={() => setPaywallVisible(false)}
+        feature="Unlimited Garage"
+        description="Free accounts hold up to 75 vehicles. Go Pro to park as many as you can catch."
+      />
     </View>
   );
 }
@@ -913,6 +943,10 @@ export default function GarageScreen() {
 
 const styles = StyleSheet.create({
   container:          { flex: 1, backgroundColor: '#0a0a0a' },
+  garageCap:          { backgroundColor: '#e63946', paddingVertical: 8, paddingHorizontal: 16, alignItems: 'center' },
+  garageCapText:      { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  garageCapWarn:      { backgroundColor: '#1a0a0a', paddingVertical: 6, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e6394622' },
+  garageCapWarnText:  { color: '#e63946aa', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
   syncErrorBanner:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2a0a0a', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e6394633' },
   syncErrorText:      { color: '#e63946', fontSize: 12, fontWeight: '700', flex: 1 },
   syncErrorDismiss:   { color: '#e63946', fontSize: 14, marginLeft: 12 },

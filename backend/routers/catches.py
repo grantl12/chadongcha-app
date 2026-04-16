@@ -19,6 +19,8 @@ from services.notification_service import (
 
 SPOTTER_XP = 150   # bonus XP for catching a registered plate
 
+FREE_GARAGE_LIMIT = 75  # max catches for non-subscriber accounts
+
 # --- Dedup configuration ---
 HASH_DEDUP_MIN_PLATE_CONFIDENCE = 0.85
 HASH_DEDUP_WINDOW_HOURS         = 4
@@ -135,6 +137,17 @@ async def ingest_catch(
         player_id = auth_result.user.id
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Garage cap — free players are limited to FREE_GARAGE_LIMIT total catches
+    p_sub = db.table("players").select("is_subscriber").eq("id", player_id).single().execute()
+    is_subscriber = bool((p_sub.data or {}).get("is_subscriber", False))
+    if not is_subscriber:
+        garage_count = db.table("catches").select("id", count="exact").eq("player_id", player_id).execute()
+        if (garage_count.count or 0) >= FREE_GARAGE_LIMIT:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Garage full ({FREE_GARAGE_LIMIT} vehicles). Upgrade to Pro for unlimited catches.",
+            )
 
     # Server-side confidence gate — reject low-confidence catches that bypass client
     if body.confidence is not None and body.catch_type != "space" and body.confidence < MIN_CATCH_CONFIDENCE:

@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/api/client';
 import { useLocation } from '@/hooks/useLocation';
-import { useCatchStore } from '@/stores/catchStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { BoostDecisionModal } from '@/components/BoostDecisionModal';
 
 type CatchableObject = {
   id: string;
@@ -41,7 +41,15 @@ function boostRemaining(expires: string | null): number {
   return Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / 60000));
 }
 
-function SatelliteRow({ item, onCatch }: { item: CatchableObject; onCatch: (item: CatchableObject) => void }) {
+function SatelliteRow({
+  item,
+  onCatch,
+  alreadyCaught,
+}: {
+  item: CatchableObject;
+  onCatch: (item: CatchableObject) => void;
+  alreadyCaught: boolean;
+}) {
   const obj    = item.space_objects;
   const rarity = obj?.rarity_tier ?? 'common';
   const color  = RARITY_COLOR[rarity] ?? '#555';
@@ -55,17 +63,25 @@ function SatelliteRow({ item, onCatch }: { item: CatchableObject; onCatch: (item
 
   return (
     <View style={styles.satRow}>
-      <View style={[styles.satDot, { backgroundColor: color }]} />
+      <View style={[styles.satDot, { backgroundColor: alreadyCaught ? '#333' : color }]} />
       <View style={styles.satBody}>
-        <Text style={styles.satName}>{obj?.name ?? 'Unknown Object'}</Text>
-        <Text style={styles.satType}>{obj?.object_type ?? '—'}  ·  {Math.round(item.max_elevation)}° max elevation</Text>
+        <Text style={[styles.satName, alreadyCaught && styles.satNameDim]}>
+          {obj?.name ?? 'Unknown Object'}
+        </Text>
+        <Text style={styles.satType}>
+          {obj?.object_type ?? '—'}  ·  {Math.round(item.max_elevation)}° max elevation
+        </Text>
       </View>
       <View style={styles.satRight}>
-        <Text style={[styles.satCountdown, isNow && styles.satCountdownNow]}>{until}</Text>
-        {isNow ? (
+        <Text style={[styles.satCountdown, isNow && !alreadyCaught && styles.satCountdownNow]}>
+          {alreadyCaught ? 'LOGGED' : until}
+        </Text>
+        {isNow && !alreadyCaught ? (
           <Pressable style={styles.catchBtn} onPress={() => onCatch(item)}>
             <Text style={styles.catchBtnText}>CATCH</Text>
           </Pressable>
+        ) : isNow && alreadyCaught ? (
+          <Text style={styles.caughtBadge}>✓</Text>
         ) : (
           <Text style={styles.satCatchable}>INCOMING</Text>
         )}
@@ -98,9 +114,8 @@ function OrbitalBoostBanner({ expires }: { expires: string | null }) {
 
 export default function OperationsScreen() {
   const { latitude, longitude } = useLocation();
-  const addCatch = useCatchStore(s => s.addCatch);
-  const orbitalBoostExpires = usePlayerStore(s => s.orbitalBoostExpires);
-  const [caught, setCaught] = useState<Set<string>>(new Set());
+  const orbitalBoostExpires     = usePlayerStore(s => s.orbitalBoostExpires);
+  const [caught, setCaught]     = useState<Set<string>>(new Set());
 
   const satQuery = useQuery({
     queryKey: ['satellites', latitude, longitude],
@@ -117,15 +132,16 @@ export default function OperationsScreen() {
   function handleCatch(item: CatchableObject) {
     if (caught.has(item.id)) return;
     setCaught(prev => new Set(prev).add(item.id));
+
     const obj = item.space_objects;
-    addCatch({
-      make:        'Space Object',
-      model:       obj?.name ?? 'Unknown',
-      generation:  obj?.name ?? 'Unknown',
-      bodyStyle:   obj?.object_type ?? 'satellite',
-      color:       'N/A',
-      confidence:  1.0,
-      catchType:   'space',
+    router.push({
+      pathname: '/satellite-catch',
+      params: {
+        catchableId: item.id,
+        objectName:  obj?.name         ?? 'Unknown Object',
+        objectType:  obj?.object_type  ?? 'satellite',
+        rarityTier:  obj?.rarity_tier  ?? 'common',
+      },
     });
   }
 
@@ -185,12 +201,16 @@ export default function OperationsScreen() {
               <SatelliteRow
                 item={item}
                 onCatch={handleCatch}
+                alreadyCaught={caught.has(item.id)}
               />
             )}
             scrollEnabled={false}
           />
         )}
       </View>
+
+      {/* Boost decision modal — appears after a satellite catch syncs */}
+      <BoostDecisionModal />
     </View>
   );
 }
@@ -231,11 +251,13 @@ const styles = StyleSheet.create({
   satDot:           { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
   satBody:          { flex: 1, gap: 3 },
   satName:          { color: '#fff', fontSize: 14, fontWeight: '700' },
+  satNameDim:       { color: '#444' },
   satType:          { color: '#444', fontSize: 12 },
   satRight:         { alignItems: 'flex-end', gap: 4 },
   satCountdown:     { color: '#555', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
   satCountdownNow:  { color: '#e63946' },
   satCatchable:     { color: '#333', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  caughtBadge:      { color: '#22c55e', fontSize: 14, fontWeight: '900' },
 
   catchBtn:         { backgroundColor: '#e63946', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 12 },
   catchBtnText:     { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 2 },

@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { router } from 'expo-router';
 import { useCatchStore, type CatchRecord } from '@/stores/catchStore';
-import { usePlayerStore } from '@/stores/playerStore';
+import { usePlayerStore, type StoredBoost, MAX_STORED_BOOSTS } from '@/stores/playerStore';
 import { useMarketStore, type MarketListing } from '@/stores/marketStore';
 import { GarageCarousel } from '@/components/GarageCarousel';
 import { computeBadges, type Badge, type BadgeCategory } from '@/utils/badges';
@@ -55,7 +55,7 @@ const CATEGORY_LABEL: Record<BadgeCategory, string> = {
   collection: 'COLLECTION',
 };
 
-type GarageTab = 'catches' | 'collection' | 'market' | 'shop';
+type GarageTab = 'catches' | 'collection' | 'market' | 'shop' | 'orbital';
 type CatchViewMode = 'grid' | '3d';
 
 const WHOLESALER_PRICES: Record<string, number> = {
@@ -473,6 +473,163 @@ function SellTab({ catches }: { catches: CatchRecord[] }) {
   );
 }
 
+// ─── OrbitalTab ──────────────────────────────────────────────────────────────
+
+const SPACE_WHOLESALER: Record<string, number> = {
+  common:    50,
+  uncommon:  150,
+  rare:      600,
+  epic:      2_000,
+  legendary: 8_000,
+};
+
+function BoostStorageSection() {
+  const storedBoosts         = usePlayerStore(s => s.storedBoosts);
+  const orbitalBoostExpires  = usePlayerStore(s => s.orbitalBoostExpires);
+  const activateOrbitalBoost = usePlayerStore(s => s.activateOrbitalBoost);
+  const consumeStoredBoost   = usePlayerStore(s => s.consumeStoredBoost);
+  const [activating, setActivating] = useState<string | null>(null);
+
+  function boostRemaining(expires: string | null) {
+    if (!expires) return 0;
+    return Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / 60000));
+  }
+
+  const activeRemaining = boostRemaining(orbitalBoostExpires);
+  const isActive        = activeRemaining > 0;
+
+  async function activateStored(boost: StoredBoost) {
+    setActivating(boost.id);
+    activateOrbitalBoost(boost.durationMin);
+    consumeStoredBoost(boost.id);
+    try {
+      await apiClient.post('/boosts/activate', { rarity_tier: boost.rarityTier });
+    } catch { /* non-fatal */ }
+    setActivating(null);
+  }
+
+  return (
+    <View style={styles.orbtSection}>
+      <Text style={styles.orbtSectionTitle}>ORBITAL BOOST</Text>
+
+      {/* Active boost status */}
+      {isActive ? (
+        <View style={styles.activeBoostBanner}>
+          <Text style={styles.activeBoostIcon}>⚡</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.activeBoostTitle}>BOOST ACTIVE</Text>
+            <Text style={styles.activeBoostSub}>{activeRemaining}m remaining · all vehicle XP boosted</Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.noBoostHint}>No active boost — catch a satellite to earn one.</Text>
+      )}
+
+      {/* Stored boosts */}
+      {storedBoosts.length > 0 && (
+        <View style={styles.storedList}>
+          <View style={styles.storedHeader}>
+            <Text style={styles.storedTitle}>STORED</Text>
+            <Text style={styles.storedCount}>{storedBoosts.length}/{MAX_STORED_BOOSTS}</Text>
+          </View>
+          {storedBoosts.map(boost => {
+            const color   = RARITY_ACCENT[boost.rarityTier] ?? '#444';
+            const bg      = RARITY_COLOR[boost.rarityTier]  ?? '#1a1a1a';
+            const isAct   = activating === boost.id;
+            const stored  = new Date(boost.storedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            return (
+              <View key={boost.id} style={[styles.storedCard, { backgroundColor: bg, borderColor: color + '44' }]}>
+                <View style={styles.storedCardLeft}>
+                  <Text style={[styles.storedMulti, { color }]}>{boost.multiplier}×</Text>
+                  <View>
+                    <Text style={styles.storedName} numberOfLines={1}>{boost.objectName}</Text>
+                    <Text style={styles.storedMeta}>{boost.durationMin}m · {stored}</Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={[styles.activateBtn, { borderColor: color + '88' }, isAct && styles.activateBtnDim]}
+                  onPress={() => activateStored(boost)}
+                  disabled={!!activating}
+                >
+                  {isAct
+                    ? <ActivityIndicator size="small" color={color} />
+                    : <Text style={[styles.activateBtnText, { color }]}>ACTIVATE</Text>
+                  }
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function SpaceCatchCard({ item, onSell }: { item: CatchRecord; onSell?: (item: CatchRecord) => void }) {
+  const rarity = item.rarity ?? 'common';
+  const color  = RARITY_ACCENT[rarity] ?? '#444';
+  const bg     = RARITY_COLOR[rarity]  ?? '#1a1a1a';
+  const date   = new Date(item.caughtAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const price  = SPACE_WHOLESALER[rarity] ?? SPACE_WHOLESALER.common;
+
+  return (
+    <Pressable
+      style={[styles.spaceCard, { backgroundColor: bg, borderColor: color + '44' }]}
+      onLongPress={() => onSell?.(item)}
+      delayLongPress={400}
+    >
+      <View style={styles.spaceCardTop}>
+        <View style={[styles.spaceTypeBadge, { borderColor: color + '66' }]}>
+          <Text style={[styles.spaceTypeText, { color }]}>SPC</Text>
+        </View>
+        {!item.synced && <View style={styles.unsyncedDot} />}
+        {item.xpEarned ? <Text style={[styles.xpBadge, { color }]}>+{item.xpEarned}</Text> : null}
+      </View>
+      <Text style={styles.spaceCardName} numberOfLines={1}>{item.model}</Text>
+      <Text style={[styles.spaceCardType, { color: color + 'aa' }]}>
+        {(item.bodyStyle ?? 'satellite').toUpperCase()}
+      </Text>
+      <View style={styles.spaceCardBottom}>
+        <Text style={[styles.spaceRarity, { color }]}>{(RARITY_LABEL[rarity] ?? 'COMMON')}</Text>
+        <Text style={[styles.spaceDate, { color: color + '88' }]}>{date}</Text>
+      </View>
+      <Text style={[styles.spaceSellHint, { color: color + '55' }]}>{price} CR</Text>
+    </Pressable>
+  );
+}
+
+function OrbitalTab({ catches, onSell }: { catches: CatchRecord[]; onSell: (item: CatchRecord) => void }) {
+  const spaceCatches = catches.filter(c => c.catchType === 'space');
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.orbtContainer} showsVerticalScrollIndicator={false}>
+      <BoostStorageSection />
+
+      <View style={styles.orbtSection}>
+        <Text style={styles.orbtSectionTitle}>CAUGHT SATELLITES</Text>
+        {spaceCatches.length === 0 ? (
+          <View style={styles.orbtEmpty}>
+            <Text style={styles.orbtEmptyTitle}>NONE YET</Text>
+            <Text style={styles.orbtEmptyText}>
+              Watch for overhead passes in the Operations screen. When one appears, hit CATCH.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.spaceGrid}>
+            {spaceCatches.map(c => (
+              <SpaceCatchCard key={c.id} item={c} onSell={onSell} />
+            ))}
+          </View>
+        )}
+      </View>
+
+      {spaceCatches.length > 0 && (
+        <Text style={styles.sellHint}>Long-press any catch to sell to wholesaler</Text>
+      )}
+    </ScrollView>
+  );
+}
+
 // ─── ShopTab ──────────────────────────────────────────────────────────────────
 
 type ShopItem = { id: string; name: string; desc: string; cost: number; icon: string; category: string };
@@ -620,14 +777,14 @@ export default function GarageScreen() {
 
       {/* Top tab bar */}
       <View style={styles.tabBar}>
-        {(['catches', 'collection', 'market', 'shop'] as GarageTab[]).map(tab => (
+        {(['catches', 'collection', 'market', 'shop', 'orbital'] as GarageTab[]).map(tab => (
           <Pressable
             key={tab}
             style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
             onPress={() => setActiveTab(tab)}
           >
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab.toUpperCase()}
+              {tab === 'orbital' ? 'ORBT' : tab.toUpperCase()}
             </Text>
           </Pressable>
         ))}
@@ -683,6 +840,7 @@ export default function GarageScreen() {
       {activeTab === 'collection' && <CollectionTab catches={catches} />}
       {activeTab === 'market' && <MarketTab mycatches={catches} />}
       {activeTab === 'shop' && <ShopTab />}
+      {activeTab === 'orbital' && <OrbitalTab catches={catches} onSell={setSellTarget} />}
 
       {/* Sell to Wholesaler modal */}
       <Modal
@@ -897,6 +1055,46 @@ const styles = StyleSheet.create({
   sellModalCancelText:{ color: '#555', fontSize: 13, fontWeight: '800', letterSpacing: 2 },
   sellModalConfirm:   { flex: 1, backgroundColor: '#e63946', borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
   sellModalConfirmText:{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 2 },
+
+  // Orbital tab
+  orbtContainer:      { padding: 16, paddingBottom: 60, gap: 24 },
+  orbtSection:        { gap: 12 },
+  orbtSectionTitle:   { color: '#333', fontSize: 10, fontWeight: '800', letterSpacing: 3, marginBottom: 4 },
+
+  activeBoostBanner:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14 },
+  activeBoostIcon:    { fontSize: 22 },
+  activeBoostTitle:   { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+  activeBoostSub:     { color: '#f59e0b88', fontSize: 11, marginTop: 2 },
+  noBoostHint:        { color: '#333', fontSize: 13 },
+
+  storedList:         { gap: 8 },
+  storedHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  storedTitle:        { color: '#555', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
+  storedCount:        { color: '#444', fontSize: 11 },
+  storedCard:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, padding: 12, gap: 10 },
+  storedCardLeft:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  storedMulti:        { fontSize: 22, fontWeight: '900', width: 44 },
+  storedName:         { color: '#fff', fontSize: 13, fontWeight: '700' },
+  storedMeta:         { color: '#555', fontSize: 11, marginTop: 2 },
+  activateBtn:        { borderWidth: 1, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 12 },
+  activateBtnDim:     { opacity: 0.5 },
+  activateBtnText:    { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+
+  orbtEmpty:          { alignItems: 'center', paddingVertical: 32, gap: 10 },
+  orbtEmptyTitle:     { color: '#333', fontSize: 22, fontWeight: '900', letterSpacing: 3 },
+  orbtEmptyText:      { color: '#2a2a2a', fontSize: 13, textAlign: 'center', lineHeight: 19 },
+
+  spaceGrid:          { gap: 10 },
+  spaceCard:          { borderRadius: 12, borderWidth: 1, padding: 14, gap: 6 },
+  spaceCardTop:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  spaceTypeBadge:     { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  spaceTypeText:      { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  spaceCardName:      { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+  spaceCardType:      { fontSize: 11, fontWeight: '600', letterSpacing: 1 },
+  spaceCardBottom:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  spaceRarity:        { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  spaceDate:          { fontSize: 11 },
+  spaceSellHint:      { fontSize: 10, fontWeight: '700' },
 
   // Shop tab
   shopContainer:      { padding: 20, paddingBottom: 60, gap: 12 },

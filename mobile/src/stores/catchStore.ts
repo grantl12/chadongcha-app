@@ -30,6 +30,8 @@ export type CatchRecord = {
   photoPaths?: string[];
   /** R2 object key — set after successful upload. */
   photoRef?: string;
+  /** catchable_objects.id — links the catch to the specific orbital pass window. */
+  spaceObjectId?: string;
 };
 
 type ResolveResult  = { generation_id: string | null; rarity_tier: string | null };
@@ -43,6 +45,12 @@ type CatchResponse  = {
   first_finder_awarded: string | null;
   orbital_boost_active: boolean;
   orbital_boost_remaining_min: number;
+  // Returned for space catches — client decides USE NOW vs STORE
+  orbital_boost_earned?: {
+    rarity_tier:  string;
+    multiplier:   number;
+    duration_min: number;
+  } | null;
   duplicate: boolean;
 };
 
@@ -145,15 +153,16 @@ export const useCatchStore = create<CatchStore>()(
             }
 
             const res = await apiClient.post('/catches', {
-              generation_id: generationId,
-              catch_type:    catch_.catchType,
-              color:         catch_.color,
-              body_style:    catch_.bodyStyle,
-              confidence:    catch_.confidence,
-              fuzzy_city:     catch_.fuzzyCity ?? null,
-              fuzzy_district: catch_.fuzzyDistrict ?? null,
-              caught_at:      catch_.caughtAt,
-              photo_ref:      photoRef ?? null,
+              generation_id:    generationId,
+              catch_type:       catch_.catchType,
+              color:            catch_.color,
+              body_style:       catch_.bodyStyle,
+              confidence:       catch_.confidence,
+              fuzzy_city:       catch_.fuzzyCity    ?? null,
+              fuzzy_district:   catch_.fuzzyDistrict ?? null,
+              caught_at:        catch_.caughtAt,
+              photo_ref:        photoRef            ?? null,
+              space_object_id:  catch_.spaceObjectId ?? null,
             }) as CatchResponse;
 
             // Sync XP from server-authoritative totals on every catch.
@@ -165,9 +174,20 @@ export const useCatchStore = create<CatchStore>()(
               usePlayerStore.getState().applyXp(0, res.new_level);
             }
 
-            // Activate orbital boost if a space catch just triggered one
-            if (res.orbital_boost_active && res.orbital_boost_remaining_min > 0) {
+            // Vehicle catch: activate orbital boost banner if one is currently running
+            if (catch_.catchType !== 'space' && res.orbital_boost_active && res.orbital_boost_remaining_min > 0) {
               usePlayerStore.getState().activateOrbitalBoost(res.orbital_boost_remaining_min);
+            }
+            // Space catch: server tells us what boost was earned; client offers USE NOW / STORE
+            // (pendingBoostDecision may already be set if satellite-catch screen set it early)
+            if (catch_.catchType === 'space' && res.orbital_boost_earned && !usePlayerStore.getState().pendingBoostDecision) {
+              usePlayerStore.getState().setPendingBoostDecision({
+                rarityTier:  res.orbital_boost_earned.rarity_tier,
+                multiplier:  res.orbital_boost_earned.multiplier,
+                durationMin: res.orbital_boost_earned.duration_min,
+                objectName:  catch_.model,
+                xpEarned:    res.xp_earned,
+              });
             }
 
             set(s => ({

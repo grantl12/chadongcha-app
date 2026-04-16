@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 
 from db import get_client
 from config import settings
-from services.xp_service import compute_xp, apply_xp, session_catch_count, get_orbital_boost, ROAD_KING_TAKEOVER_XP
+from services.xp_service import compute_xp, apply_xp, session_catch_count, get_orbital_boost, ROAD_KING_TAKEOVER_XP, ORBITAL_BOOST_MULTIPLIERS
 from services.territory_service import record_road_scan
 from services.first_finder_service import check_first_finder
 from services import feed_service
@@ -335,6 +335,29 @@ async def ingest_catch(
             "badge_name":    first_finder_awarded.get("badge", ""),
         })
 
+    # For space catches, tell the client what boost was earned so it can
+    # present the USE NOW / STORE decision. The boost is NOT auto-activated
+    # server-side here — the client calls POST /boosts/activate when ready.
+    orbital_boost_earned = None
+    if body.catch_type == "space":
+        # Look up rarity from the caught object (if space_object_id was supplied)
+        sat_rarity = "common"
+        if body.space_object_id:
+            sat_row = db.table("catchable_objects") \
+                .select("space_objects(rarity_tier)") \
+                .eq("id", body.space_object_id) \
+                .maybe_single() \
+                .execute()
+            if sat_row and sat_row.data:
+                so = (sat_row.data.get("space_objects") or {})
+                sat_rarity = so.get("rarity_tier", "common") if so else "common"
+        mult, dur = ORBITAL_BOOST_MULTIPLIERS.get(sat_rarity, (1.25, 20))
+        orbital_boost_earned = {
+            "rarity_tier":  sat_rarity,
+            "multiplier":   mult,
+            "duration_min": dur,
+        }
+
     return {
         "catch_id": catch_id,
         "xp_earned": xp_earned + spotter_bonus_xp,
@@ -346,6 +369,7 @@ async def ingest_catch(
         "spotter_bonus_xp": spotter_bonus_xp,
         "orbital_boost_active": orbital_boost > 1.0,
         "orbital_boost_remaining_min": boost_remaining,
+        "orbital_boost_earned": orbital_boost_earned,
         "duplicate": False,
     }
 

@@ -486,6 +486,33 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- ============================================================
+-- ORBITAL BOOST INVENTORY (migration 005)
+-- Explicit activation column so clients control when the boost fires.
+-- Before this migration, boost was derived from the most recent space catch time.
+-- After: POST /boosts/activate sets this column; get_orbital_boost reads it.
+-- ============================================================
+
+alter table players add column if not exists orbital_boost_expires_at timestamptz;
+
+-- Stored boosts — up to 5 per player (enforced at app layer, not DB).
+-- Rows are deleted when the player activates the boost from inventory.
+create table if not exists boost_inventory (
+  id            uuid primary key default uuid_generate_v4(),
+  player_id     uuid not null references players(id) on delete cascade,
+  rarity_tier   text not null check (rarity_tier in ('common','uncommon','rare','epic','legendary')),
+  multiplier    float not null,
+  duration_min  int   not null,
+  object_name   text  not null,
+  stored_at     timestamptz not null default now()
+);
+create index if not exists boost_inventory_player_idx on boost_inventory(player_id, stored_at);
+alter table boost_inventory enable row level security;
+do $$ begin
+  create policy "boost_inventory_owner" on boost_inventory
+    using (player_id = auth.uid()) with check (player_id = auth.uid());
+exception when duplicate_object then null; end $$;
+
+-- ============================================================
 -- UPDATED_AT TRIGGER
 -- ============================================================
 

@@ -54,12 +54,44 @@ def _diminish_multiplier(session_count: int) -> float:
 
 def get_orbital_boost(db, player_id: str) -> tuple[float, int] | None:
     """
-    Return (multiplier, minutes_remaining) if the player has an active Orbital
-    Boost (caught a space object within its boost window), else None.
-    Checks the most recent space catch and its space_object rarity tier.
+    Return (multiplier, minutes_remaining) if the player has an active Orbital Boost, else None.
+
+    Reads from players.orbital_boost_expires_at (set via POST /boosts/activate).
+    Falls back to deriving from the most recent space catch for backward compatibility
+    with players who caught satellites before migration 005 was applied.
     """
+    # Primary: explicit activation column (migration 005+)
+    p_row = db.table("players") \
+        .select("orbital_boost_expires_at") \
+        .eq("id", player_id) \
+        .maybe_single() \
+        .execute()
+    expires_at_str = ((p_row.data if p_row else None) or {}).get("orbital_boost_expires_at")
+    if expires_at_str:
+        try:
+            expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
+            remaining_sec = (expires_at - datetime.now(timezone.utc)).total_seconds()
+            if remaining_sec > 0:
+                # Derive multiplier from remaining fraction — store it in a fixed column
+                # for now we return a sensible default; precise multiplier requires
+                # storing it alongside the expiry (future enhancement).
+                remaining_min = int(remaining_sec / 60)
+                # We don't know the rarity from just the expiry, so read from boost_inventory
+                # or fall through to the legacy path. For activated boosts we stored multiplier.
+                boost_row = db.table("boost_inventory") \
+                    .select("multiplier") \
+                    .eq("player_id", player_id) \
+                    .order("stored_at", desc=True) \
+                    .limit(1) \
+                    .execute()
+                multiplier = (boost_row.data[0].get("multiplier", 1.5) if boost_row.data else 1.5)
+                return multiplier, remaining_min
+        except (ValueError, AttributeError):
+            pass
+
+    # Fallback: legacy — derive from most recent space catch (pre-migration behaviour)
     result = db.table("catches") \
-        .select("caught_at, space_objects(rarity_tier)") \
+        .select("caught_at, catchable_objects(space_objects(rarity_tier))") \
         .eq("player_id", player_id) \
         .eq("catch_type", "space") \
         .order("caught_at", desc=True) \
@@ -76,7 +108,8 @@ def get_orbital_boost(db, player_id: str) -> tuple[float, int] | None:
     except (ValueError, AttributeError):
         return None
 
-    space_obj = row.get("space_objects") or {}
+    catchable = row.get("catchable_objects") or {}
+    space_obj = catchable.get("space_objects") or {}
     rarity = space_obj.get("rarity_tier", "common") if space_obj else "common"
     multiplier, duration_min = ORBITAL_BOOST_MULTIPLIERS.get(rarity, (1.25, 20))
 

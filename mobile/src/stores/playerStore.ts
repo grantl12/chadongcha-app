@@ -2,6 +2,25 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export type StoredBoost = {
+  id:          string;
+  rarityTier:  string;
+  multiplier:  number;
+  durationMin: number;
+  objectName:  string;
+  storedAt:    string;
+};
+
+export type PendingBoostDecision = {
+  rarityTier:  string;
+  multiplier:  number;
+  durationMin: number;
+  objectName:  string;
+  xpEarned:    number;
+};
+
+export const MAX_STORED_BOOSTS = 5;
+
 type PlayerStore = {
   userId: string | null;
   username: string | null;
@@ -13,6 +32,9 @@ type PlayerStore = {
   xpBoostExpires: string | null;
   scanBoostExpires: string | null;
   idHints: number;
+  storedBoosts: StoredBoost[];
+  pendingBoostDecision: PendingBoostDecision | null;
+
   setPlayer: (data: { userId: string; username: string; accessToken: string }) => void;
   setProfile: (xp: number, level: number) => void;
   setFullProfile: (data: {
@@ -31,6 +53,10 @@ type PlayerStore = {
     scanBoostExpires?: string | null;
     idHints?: number;
   }) => void;
+  setPendingBoostDecision: (boost: PendingBoostDecision) => void;
+  clearPendingBoostDecision: () => void;
+  addStoredBoost: (boost: StoredBoost) => void;
+  consumeStoredBoost: (id: string) => void;
   clearSession: () => void;
 };
 
@@ -47,6 +73,8 @@ export const usePlayerStore = create<PlayerStore>()(
       xpBoostExpires: null,
       scanBoostExpires: null,
       idHints: 0,
+      storedBoosts: [],
+      pendingBoostDecision: null,
 
       setPlayer({ userId, username, accessToken }) {
         set({ userId, username, accessToken });
@@ -91,12 +119,33 @@ export const usePlayerStore = create<PlayerStore>()(
         }));
       },
 
+      setPendingBoostDecision(boost) {
+        set({ pendingBoostDecision: boost });
+      },
+
+      clearPendingBoostDecision() {
+        set({ pendingBoostDecision: null });
+      },
+
+      addStoredBoost(boost) {
+        set(s => ({
+          storedBoosts: s.storedBoosts.length < MAX_STORED_BOOSTS
+            ? [...s.storedBoosts, boost]
+            : s.storedBoosts,
+        }));
+      },
+
+      consumeStoredBoost(id) {
+        set(s => ({ storedBoosts: s.storedBoosts.filter(b => b.id !== id) }));
+      },
+
       clearSession() {
         set({
           userId: null, username: null, accessToken: null,
           xp: 0, level: 1, credits: 0,
           orbitalBoostExpires: null, xpBoostExpires: null,
           scanBoostExpires: null, idHints: 0,
+          storedBoosts: [], pendingBoostDecision: null,
         });
       },
     }),

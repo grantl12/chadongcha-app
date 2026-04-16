@@ -2,11 +2,14 @@
  * Expo config plugin — VehicleClassifier
  *
  * During `expo prebuild`:
- *  1. Copies vehicle_classifier.mlpackage + class_map.json from assets/ into the
- *     generated ios/<ProjectName>/ directory so Xcode bundles them natively.
- *  2. Adds the local VehicleClassifier pod to the Podfile.
+ *  iOS:
+ *   1. Copies vehicle_classifier.mlpackage + class_map.json from assets/ into
+ *      ios/<ProjectName>/ so Xcode bundles them. Xcode compiles .mlpackage → .mlmodelc.
+ *   2. Adds the local VehicleClassifier pod to the Podfile.
  *
- * The mlpackage is compiled to .mlmodelc by Xcode at build time (no extra steps needed).
+ *  Android:
+ *   3. Copies vehicle_classifier.tflite + class_map.json into
+ *      android/app/src/main/assets/ so they're accessible via AssetManager at runtime.
  */
 
 const { withDangerousMod, withXcodeProject, withPodfile } = require('@expo/config-plugins');
@@ -110,7 +113,42 @@ function withModelXcodeResources(config) {
   });
 }
 
+// ── 4. Copy tflite + class_map into android/app/src/main/assets/ ─────────────
+
+function withAndroidModelAssets(config) {
+  return withDangerousMod(config, [
+    'android',
+    async (config) => {
+      const projectRoot  = config.modRequest.projectRoot;
+      const assetsDir    = path.join(projectRoot, 'assets');
+      const androidAssets = path.join(projectRoot, 'android', 'app', 'src', 'main', 'assets');
+
+      fs.mkdirSync(androidAssets, { recursive: true });
+
+      const filesToCopy = [
+        'vehicle_classifier.tflite',
+        'class_map.json',
+      ];
+
+      for (const file of filesToCopy) {
+        const src = path.join(assetsDir, file);
+        const dst = path.join(androidAssets, file);
+        if (!fs.existsSync(src)) {
+          console.warn(`[withVehicleClassifier] Missing asset: ${src}`);
+          continue;
+        }
+        fs.copyFileSync(src, dst);
+        console.log(`[withVehicleClassifier] Copied ${file} → android/app/src/main/assets/`);
+      }
+
+      return config;
+    },
+  ]);
+}
+
 // ── Compose ───────────────────────────────────────────────────────────────────
 
 module.exports = (config) =>
-  withModelXcodeResources(withVehicleClassifierPod(withModelAssets(config)));
+  withAndroidModelAssets(
+    withModelXcodeResources(withVehicleClassifierPod(withModelAssets(config)))
+  );

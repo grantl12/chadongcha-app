@@ -27,9 +27,8 @@ mobile/android/
 ml/data/images/
 ml/data/images.zip
 
-# Model binaries
-# mlpackage is tracked in git (8 MB) — force-add after training a new model
-mobile/assets/vehicle_classifier.tflite
+# Model binaries — both tracked in git; force-add after retraining
+# mlpackage ~8 MB (iOS CoreML), tflite ~8 MB (Android)
 
 # Misc
 .DS_Store

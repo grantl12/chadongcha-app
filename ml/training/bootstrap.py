@@ -130,7 +130,12 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
         device = torch_directml.device()
         using_directml = True
         print("Device: DirectML (AMD GPU)")
-    except ImportError:
+    except Exception as e:
+        # ImportError  — package not installed
+        # TypeError    — torch_directml staticmethod bug on Python 3.8
+        # Any other    — DML not available on this system
+        if not isinstance(e, ImportError):
+            print(f"  [DirectML] Skipped ({type(e).__name__}: {e})")
         device = (
             "cuda" if torch.cuda.is_available()
             else "mps" if torch.backends.mps.is_available()

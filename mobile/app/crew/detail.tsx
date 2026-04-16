@@ -1,12 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator,
-  RefreshControl, ScrollView
+  RefreshControl, ScrollView, Alert
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { crewApi, Crew, CrewMember } from '@/src/api/crews';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { crewApi, Crew, CrewMember } from '@/api/crews';
 import { usePlayerStore } from '@/stores/playerStore';
 
 export default function CrewDetailScreen() {
@@ -32,7 +32,7 @@ export default function CrewDetailScreen() {
       // playerStore.setCrewId(null); 
       router.replace('/crew'); // Navigate back to the crew hub/list
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error("Failed to leave crew:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
@@ -80,7 +80,7 @@ export default function CrewDetailScreen() {
           <View style={styles.sectionLine} />
         </View>
 
-        {crew.members?.map((member, i) => (
+        {crew.members?.map((member: CrewMember, i: number) => (
           <View key={member.id} style={styles.memberRow}>
             <Text style={styles.memberRank}>#{i + 1}</Text>
             <View style={styles.memberBody}>

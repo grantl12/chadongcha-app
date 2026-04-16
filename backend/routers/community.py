@@ -144,6 +144,10 @@ class SuggestBody(BaseModel):
     model: str
     generation: str = ""
 
+class GuessBody(BaseModel):
+    card_id: str
+    guess: str
+
 @router.post("/suggest")
 async def suggest_id(body: SuggestBody, authorization: str = Header(...)):
     db = get_client()

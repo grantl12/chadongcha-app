@@ -41,5 +41,5 @@ jobs:
       # Without this, .expo/types/router.d.ts is missing (it's gitignored)
       # and the TS check fails even though expo/tsconfig.base sets skipLibCheck.
       - name: Generate Expo Router types
-        run: npx expo export --dump-sourcemap --platform web 2>/dev/null || true
+        run: npx expo export --platform android 2>/dev/null || true
       - run: npx tsc --noEmit

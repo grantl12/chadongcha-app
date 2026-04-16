@@ -1,5 +1,6 @@
 node_modules/
 .expo/
+!.expo/types/router.d.ts
 /ios/
 /android/
 dist/

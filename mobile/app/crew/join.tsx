@@ -6,7 +6,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { crewApi, Crew, CrewMember } from '@/src/api/crews';
+import { crewApi, Crew, CrewMember } from '@/api/crews';
 import { usePlayerStore } from '@/stores/playerStore';
 
 export default function JoinCrewScreen() {
@@ -60,11 +60,11 @@ export default function JoinCrewScreen() {
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#e63946" />
-          <Text style={styles.hint}>Searching for crews…</Text>
+          <Text style={styles.emptyText}>Searching for crews…</Text>
         </View>
       ) : isError ? (
         <View style={styles.center}>
-          <Text style={styles.hint}>Could not load crews. Try again later.</Text>
+          <Text style={styles.emptyText}>Could not load crews. Try again later.</Text>
         </View>
       ) : (
         <FlatList

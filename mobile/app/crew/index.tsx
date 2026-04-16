@@ -6,7 +6,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { crewApi, Crew, CrewMember } from '@/src/api/crews';
+import { crewApi, Crew, CrewMember } from '@/api/crews';
 import { usePlayerStore } from '@/stores/playerStore';
 import { PaywallModal } from '@/components/PaywallModal';
 
@@ -140,7 +140,7 @@ export default function CrewScreen() {
           <View style={styles.sectionLine} />
         </View>
 
-        {crew?.members?.map((member, i) => (
+        {crew?.members?.map((member: CrewMember, i: number) => (
           <View key={member.id} style={styles.memberRow}>
             <Text style={styles.memberRank}>#{i + 1}</Text>
             <View style={styles.memberBody}>

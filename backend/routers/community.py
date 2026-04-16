@@ -38,7 +38,8 @@ def is_close_match(guess, actual, threshold=2):
     """
     g = guess.lower().strip()
     a = actual.lower().strip()
-    if not g: return False
+    if not g:
+        return False
     # Threshold scales slightly with length for very short names
     dist = levenshtein_distance(g, a)
     max_dist = threshold if len(a) > 4 else 1
@@ -57,15 +58,18 @@ def _resolve_player(db, authorization: str) -> str:
 def _resolve_generation(db, make: str, model: str, generation: str) -> Optional[str]:
     """Attempt to match free-text make/model/generation to a generations row."""
     make_res = db.table("makes").select("id").ilike("name", f"%{make}%").limit(1).execute()
-    if not make_res.data: return None
+    if not make_res.data:
+        return None
     make_id = make_res.data[0]["id"]
 
     model_res = db.table("models").select("id").eq("make_id", make_id).ilike("name", f"%{model}%").limit(1).execute()
-    if not model_res.data: return None
+    if not model_res.data:
+        return None
     model_id = model_res.data[0]["id"]
 
     gen_res = db.table("generations").select("id").eq("model_id", model_id).ilike("common_name", f"%{generation}%").limit(1).execute()
-    if gen_res.data: return gen_res.data[0]["id"]
+    if gen_res.data:
+        return gen_res.data[0]["id"]
 
     fallback = db.table("generations").select("id").eq("model_id", model_id).order("year_start", desc=True).limit(1).execute()
     return fallback.data[0]["id"] if fallback.data else None
@@ -108,7 +112,8 @@ async def list_unknown(limit: int = 20, offset: int = 0):
 async def get_unknown(unknown_id: str):
     db = get_client()
     res = db.table("unknown_catches").select("id, catch_id, body_type, city, community_photo_ref, status, created_at, catches(catch_type, caught_at, players(username))").eq("id", unknown_id).maybe_single().execute()
-    if not res or not res.data: raise HTTPException(status_code=404, detail="Unknown catch not found")
+    if not res or not res.data:
+        raise HTTPException(status_code=404, detail="Unknown catch not found")
     r = res.data
     sugg_res = db.table("id_suggestions").select("generation_id, generations(common_name, models(name, makes(name)))").eq("unknown_catch_id", unknown_id).execute()
     tally = {}
@@ -153,10 +158,13 @@ async def suggest_id(body: SuggestBody, authorization: str = Header(...)):
     db = get_client()
     player_id = _resolve_player(db, authorization)
     unk = db.table("unknown_catches").select("id, status").eq("id", body.unknown_catch_id).maybe_single().execute()
-    if not unk or not unk.data: raise HTTPException(status_code=404, detail="Unknown catch not found")
-    if unk.data["status"] != "open": raise HTTPException(status_code=409, detail="This catch is already identified")
+    if not unk or not unk.data:
+        raise HTTPException(status_code=404, detail="Unknown catch not found")
+    if unk.data["status"] != "open":
+        raise HTTPException(status_code=409, detail="This catch is already identified")
     generation_id = _resolve_generation(db, body.make, body.model, body.generation)
-    if not generation_id: raise HTTPException(status_code=422, detail="Could not find a matching vehicle.")
+    if not generation_id:
+        raise HTTPException(status_code=422, detail="Could not find a matching vehicle.")
     db.table("id_suggestions").upsert({"unknown_catch_id": body.unknown_catch_id, "player_id": player_id, "generation_id": generation_id}, on_conflict="unknown_catch_id,player_id").execute()
     _maybe_auto_confirm(db, body.unknown_catch_id)
     return {"ok": True, "generation_id": generation_id}
@@ -169,10 +177,12 @@ def _maybe_auto_confirm(db, unknown_catch_id: str) -> None:
         gid = s["generation_id"]
         tally[gid] = tally.get(gid, 0) + 1
     winning_gen = next((gid for gid, count in tally.items() if count >= QUORUM), None)
-    if not winning_gen: return
+    if not winning_gen:
+        return
     db.table("unknown_catches").update({"status": "confirmed", "confirmed_generation_id": winning_gen}).eq("id", unknown_catch_id).execute()
     unk = db.table("unknown_catches").select("catch_id").eq("id", unknown_catch_id).maybe_single().execute()
-    if not (unk and unk.data): return
+    if not (unk and unk.data):
+        return
     catch_id = unk.data["catch_id"]
     db.table("catches").update({"generation_id": winning_gen}).eq("id", catch_id).execute()
     catch_row = db.table("catches").select("player_id, catch_type").eq("id", catch_id).maybe_single().execute()
@@ -245,7 +255,8 @@ async def identify_guess(body: GuessBody, authorization: str = Header(...)):
     db = get_client()
     player_id = _resolve_player(db, authorization)
     item = db.table("id_game_queue").select("id, answer_class, answer_label, body_style, is_text_entry").eq("id", body.card_id).eq("status", "active").maybe_single().execute()
-    if not item or not item.data: raise HTTPException(status_code=404, detail="Card not found")
+    if not item or not item.data:
+        raise HTTPException(status_code=404, detail="Card not found")
     
     existing = db.table("id_game_guesses").select("id, correct, xp_awarded").eq("player_id", player_id).eq("card_id", body.card_id).maybe_single().execute()
     if existing and existing.data:
@@ -300,7 +311,8 @@ def _check_id_badges(db, player_id: str) -> Optional[dict]:
     recent = recent_res.data or []
     if len(recent) == 10 and all(r["correct"] for r in recent):
         badge = _award_badge(db, player_id, "streak_10", "Sharpshooter")
-        if badge: return badge
+        if badge:
+            return badge
 
     # 2. Text Master 25 (Type Master)
     # 25 correct guesses on cards where is_text_entry = true
@@ -313,7 +325,8 @@ def _check_id_badges(db, player_id: str) -> Optional[dict]:
         .execute()
     if (text_res.count or 0) >= 25:
         badge = _award_badge(db, player_id, "text_master_25", "Type Master")
-        if badge: return badge
+        if badge:
+            return badge
 
     # 3. Volume 100 (Catalog Chronicler)
     total_res = db.table("id_game_guesses") \
@@ -323,7 +336,8 @@ def _check_id_badges(db, player_id: str) -> Optional[dict]:
         .execute()
     if (total_res.count or 0) >= 100:
         badge = _award_badge(db, player_id, "volume_100", "Catalog Chronicler")
-        if badge: return badge
+        if badge:
+            return badge
 
     return None
 
@@ -335,7 +349,8 @@ def _award_badge(db, player_id: str, badge_type: str, label: str) -> Optional[di
         .eq("badge_type", badge_type) \
         .maybe_single() \
         .execute()
-    if already and already.data: return None
+    if already and already.data:
+        return None
 
     db.table("player_badges").insert({
         "player_id":  player_id,

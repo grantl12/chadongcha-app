@@ -17,8 +17,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 # Reuse scraping/upload infrastructure from seed_id_game.py
 sys.path.insert(0, os.path.dirname(__file__))
-from seed_id_game import (
-    download_image, image_hash, upload_to_r2,
+from seed_id_game import (  # noqa: E402
     scrape_car, DATA_DIR, SQL_FILE, IMAGES_PER_CAR,
 )
 

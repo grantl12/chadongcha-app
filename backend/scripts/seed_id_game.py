@@ -6,14 +6,12 @@ Saves to ml/data/id_game/ and generates SQL for R2 migration.
 
 import hashlib
 import os
-import sys
 import uuid
 import time
 import random
 import logging
 from io import BytesIO
 from pathlib import Path
-from typing import List, Optional
 
 import boto3
 import requests
@@ -160,7 +158,8 @@ def download_image(url: str):
         r.raise_for_status()
         img = Image.open(BytesIO(r.content)).convert("RGB")
         w, h = img.size
-        if w < MIN_IMAGE_SIZE or h < MIN_IMAGE_SIZE: return None
+        if w < MIN_IMAGE_SIZE or h < MIN_IMAGE_SIZE:
+            return None
         if max(w, h) > MAX_IMAGE_SIZE:
             ratio = MAX_IMAGE_SIZE / max(w, h)
             img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
@@ -188,8 +187,9 @@ def scrape_car(ddgs, car: dict, seen_hashes: set, sql_f) -> int:
     log.info("%-25s  need %d images...", label, IMAGES_PER_CAR)
 
     for query in queries:
-        if saved >= IMAGES_PER_CAR: break
-        
+        if saved >= IMAGES_PER_CAR:
+            break
+
         results = []
         retries = 3
         for attempt in range(retries):
@@ -215,18 +215,23 @@ def scrape_car(ddgs, car: dict, seen_hashes: set, sql_f) -> int:
                     log.error(f"  Search failed after {retries} attempts for {query}")
                     continue
         
-        if not results: continue
+        if not results:
+            continue
 
         for res in results:
-            if saved >= IMAGES_PER_CAR: break
+            if saved >= IMAGES_PER_CAR:
+                break
             url = res.get("image")
-            if not url: continue
+            if not url:
+                continue
 
             raw = download_image(url)
-            if not raw: continue
+            if not raw:
+                continue
 
             h = image_hash(raw)
-            if h in seen_hashes: continue
+            if h in seen_hashes:
+                continue
             seen_hashes.add(h)
 
             car_uuid  = str(uuid.uuid4())

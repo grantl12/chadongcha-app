@@ -1,4 +1,5 @@
 
+import asyncio
 import logging
 
 from workers.osm_seeder import seed_area

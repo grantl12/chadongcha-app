@@ -274,7 +274,8 @@ async def compute_passes() -> None:
 
     # Load satellites
     rows = db.table("space_objects").select("id, name, tle_line1, tle_line2").eq("active", True).not_.is_("tle_line1", "null").execute()
-    if not rows.data: return
+    if not rows.data:
+        return
 
     # Fetch unique player home locations (rounded to 1 decimal for clustering ~10km)
     # Note: Postgrest doesn't support distinct on rounded values easily, so we fetch and dedupe in python
@@ -291,7 +292,8 @@ async def compute_passes() -> None:
     for row in rows.data:
         try:
             sat = Satrec.twoline2rv(row["tle_line1"], row["tle_line2"])
-        except Exception: continue
+        except Exception:
+            continue
 
         for lat, lon in locations:
             try:

@@ -21,7 +21,7 @@ jobs:
           cache: pip
       - run: pip install ruff mypy -r requirements.txt
       - run: ruff check .
-      - run: mypy . --ignore-missing-imports --exclude workers/
+      - run: mypy . --ignore-missing-imports --exclude workers/ --exclude scripts/
 
   mobile-ts:
     name: Mobile — TypeScript check

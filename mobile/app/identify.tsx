@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
+import { BadgeAwardModal } from '@/src/components/BadgeAwardModal';
 
 type IdCard = {
   id: string;
@@ -30,6 +31,7 @@ type GuessResult = {
   xp_earned: number;
   new_total_xp: number;
   new_level: number;
+  badge_earned?: { type: string, label: string } | null;
 };
 
 export default function IdentifyScreen() {
@@ -39,6 +41,7 @@ export default function IdentifyScreen() {
   const [cardIndex, setCardIndex]   = useState(0);
   const [guessText, setGuessText]   = useState('');
   const [result, setResult]         = useState<GuessResult & { guessed: string } | null>(null);
+  const [earnedBadge, setEarnedBadge] = useState<{ type: string, label: string } | null>(null);
   const inputRef = useRef<TextInput>(null);
 
   const { data: cards = [], isLoading, isError } = useQuery<IdCard[]>({
@@ -56,6 +59,11 @@ export default function IdentifyScreen() {
     onSuccess(data, variables) {
       setResult({ ...data, guessed: variables.guess });
       setProfile(data.new_total_xp, data.new_level);
+
+      if (data.badge_earned) {
+        setEarnedBadge(data.badge_earned);
+      }
+
       if (data.correct) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
@@ -90,6 +98,8 @@ export default function IdentifyScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
+      <BadgeAwardModal badge={earnedBadge} onClose={() => setEarnedBadge(null)} />
+
       {/* Header */}
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>

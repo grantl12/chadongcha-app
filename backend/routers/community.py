@@ -231,10 +231,6 @@ async def identify_queue(limit: int = 5, authorization: str = Header(...)):
         })
     return cards
 
-class GuessBody(BaseModel):
-    card_id: str
-    guess: str
-
 @router.post("/identify-guess")
 async def identify_guess(body: GuessBody, authorization: str = Header(...)):
     db = get_client()
@@ -261,7 +257,90 @@ async def identify_guess(body: GuessBody, authorization: str = Header(...)):
         apply_xp(db, player_id, xp_earned, body.card_id, ["id_game_correct"])
 
     db.table("id_game_guesses").insert({"player_id": player_id, "card_id": body.card_id, "guessed_class": body.guess, "correct": correct, "xp_awarded": xp_earned}).execute()
-    return {"correct": correct, "correct_label": item.data["answer_label"], "xp_earned": xp_earned, "new_total_xp": _get_player_xp(db, player_id), "new_level": _get_player_level(db, player_id)}
+    
+    # Badge Checks (Completionist Satisfaction)
+    new_badge = None
+    if correct:
+        new_badge = _check_id_badges(db, player_id)
+
+    return {
+        "correct":       correct,
+        "correct_label": item.data["answer_label"],
+        "xp_earned":     xp_earned,
+        "new_total_xp":  _get_player_xp(db, player_id),
+        "new_level":     _get_player_level(db, player_id),
+        "badge_earned":  new_badge
+    }
+
+def _check_id_badges(db, player_id: str) -> Optional[dict]:
+    """
+    Checks for and awards ID game achievement badges:
+      - streak_10: 10 correct in a row
+      - text_master_25: 25 correct text-entry guesses
+      - volume_100: 100 total correct guesses
+    Returns the first newly awarded badge info, or None.
+    """
+    # 1. Streak 10 (Sharpshooter)
+    # Most recent 10 guesses must all be correct
+    recent_res = db.table("id_game_guesses") \
+        .select("correct") \
+        .eq("player_id", player_id) \
+        .order("created_at", desc=True) \
+        .limit(10) \
+        .execute()
+    recent = recent_res.data or []
+    if len(recent) == 10 and all(r["correct"] for r in recent):
+        badge = _award_badge(db, player_id, "streak_10", "Sharpshooter")
+        if badge: return badge
+
+    # 2. Text Master 25 (Type Master)
+    # 25 correct guesses on cards where is_text_entry = true
+    # Requires a join or a count on the guesses where the card was text entry
+    text_res = db.table("id_game_guesses") \
+        .select("id", count="exact") \
+        .eq("player_id", player_id) \
+        .eq("correct", True) \
+        .filter("card_id", "in", f"({_get_text_card_ids_subquery(db)})") \
+        .execute()
+    if (text_res.count or 0) >= 25:
+        badge = _award_badge(db, player_id, "text_master_25", "Type Master")
+        if badge: return badge
+
+    # 3. Volume 100 (Catalog Chronicler)
+    total_res = db.table("id_game_guesses") \
+        .select("id", count="exact") \
+        .eq("player_id", player_id) \
+        .eq("correct", True) \
+        .execute()
+    if (total_res.count or 0) >= 100:
+        badge = _award_badge(db, player_id, "volume_100", "Catalog Chronicler")
+        if badge: return badge
+
+    return None
+
+def _award_badge(db, player_id: str, badge_type: str, label: str) -> Optional[dict]:
+    """Award badge if not already owned. Returns badge info if newly awarded."""
+    already = db.table("player_badges") \
+        .select("id") \
+        .eq("player_id", player_id) \
+        .eq("badge_type", badge_type) \
+        .maybe_single() \
+        .execute()
+    if already and already.data: return None
+
+    db.table("player_badges").insert({
+        "player_id":  player_id,
+        "badge_type": badge_type,
+        "label":      label
+    }).execute()
+    
+    return {"type": badge_type, "label": label}
+
+def _get_text_card_ids_subquery(db) -> str:
+    """Helper to get a list of card IDs that are text entry."""
+    res = db.table("id_game_queue").select("id").eq("is_text_entry", True).execute()
+    ids = [f"'{r['id']}'" for r in (res.data or [])]
+    return ",".join(ids) if ids else "'00000000-0000-0000-0000-000000000000'"
 
 def _get_player_xp(db, player_id: str) -> int:
     r = db.table("players").select("xp").eq("id", player_id).single().execute()

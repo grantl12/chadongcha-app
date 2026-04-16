@@ -53,8 +53,8 @@ chadongcha/
 
 **Backend:** FastAPI · Supabase (Postgres + Auth + RLS) · Railway · Cloudflare R2 · Expo Push API · Celestrak TLEs  
 **Mobile:** Expo SDK 52 · Expo Router · React Query · Zustand · VisionCamera v4 · Mapbox  
-**ML:** MobileNetV3-Large fine-tuned locally (AMD GPU via torch-directml) · 41 classes · CoreML `.mlpackage` (iOS) + ONNX  
-**CI:** GitHub Actions → EAS cloud builds (auto-trigger on push, cancels stale build queue)
+**ML:** MobileNetV3-Large fine-tuned locally (AMD GPU via torch-directml) · 63 classes · CoreML `.mlpackage` (iOS) + TFLite float16 (Android) + ONNX  
+**CI:** GitHub Actions → EAS cloud builds (auto-trigger on push, cancels stale build queue) · ruff + mypy + tsc on every push
 
 ---
 
@@ -282,16 +282,18 @@ Duplicate catches are still recorded — it's a real sighting — just no XP.
 
 ## ML
 
-**Model:** MobileNetV3-Large fine-tuned on 41 classes (~6,150 images from DuckDuckGo).
+**Model:** MobileNetV3-Large fine-tuned on 63 classes (~9,450 images from DuckDuckGo).
 
-**Classes:** 30 passenger cars + 4 trucks + 6 motorcycles + 1 `_Background` (negative class — teaches the model to output low confidence on non-vehicle inputs, preventing softmax from always forcing a winner).
+**Classes:** 47 passenger cars + 7 trucks + 7 motorcycles + 1 `_Background` (negative class — teaches the model to output low confidence on non-vehicle inputs, preventing softmax from always forcing a winner).
+
+**Current version:** v0.2.0 · val_acc 0.8738
 
 **Training pipeline:**
 
 ```bash
-# 1. Create venv and install deps (Windows)
-python -m venv .venv
-.venv\Scripts\activate
+# 1. Create venv and install deps (Windows — use ml/.venv310)
+py -3.10 -m venv .venv310
+.venv310\Scripts\activate
 
 # NVIDIA:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 # AMD:     pip install torch torchvision torch-directml
@@ -300,21 +302,41 @@ pip install timm onnx onnxruntime duckduckgo_search requests Pillow
 # 2. Scrape images (~15-30 min)
 python training\scrape_images.py --data-dir "D:\path\to\ml\data\images"
 
-# 3. Verify dataset (expect 41 classes)
+# 3. Verify dataset (expect 63 classes)
 python training\bootstrap.py --phase info
 
 # 4. Train (early-stops after --patience epochs without improvement)
-python training\bootstrap.py --phase classify --epochs 50 --patience 7 \
+python training\bootstrap.py --phase classify --epochs 50 --patience 10 \
   --data-dir "D:\path\to\ml\data\images"
 
 # 5. Resume if interrupted
 python training\bootstrap.py --phase classify --epochs 20 --resume
 
-# 6. Export to ONNX
+# 6. Export to ONNX + CoreML (.mlpackage — macOS/Linux only for CoreML)
 python training\bootstrap.py --phase export
+
+# 7. Convert ONNX → TFLite (Windows, uses ml/.venv310 with onnx2tf + tensorflow-cpu)
+pip install onnx2tf tensorflow-cpu tf_keras onnx-graphsurgeon sng4onnx onnxsim onnxslim psutil ai-edge-litert
+onnx2tf -i export/vehicle_classifier.onnx -o export/tflite_out --non_verbose
+# Use export/tflite_out/vehicle_classifier_float16.tflite
+
+# 8. Deploy to R2 and activate
+python ml\deploy_model.py --version X.Y.Z
+# Then update MODEL_CURRENT_VERSION in Railway shared variables → redeploy api
 ```
 
-**Integration:** `VehicleClassifierModule` (Swift, Expo Modules API) loads the `.mlpackage` at startup, runs `VNCoreMLRequest` on each snapshot, resolves a Promise back to JS. `class_map.json` maps output indices to `Make_Model_Generation` strings.
+**After retraining — copy models into mobile/assets:**
+```bash
+cp -r ml/export/vehicle_classifier.mlpackage mobile/assets/
+cp ml/export/tflite_out/vehicle_classifier_float16.tflite mobile/assets/vehicle_classifier.tflite
+python -c "import json; m=json.load(open('ml/export/manifest.json')); print(json.dumps({str(i):c for i,c in enumerate(m['classes'])}, indent=2))" > mobile/assets/class_map.json
+```
+Both model files are tracked in git (~8 MB each). The `withVehicleClassifier` Expo plugin copies them into the native projects during `expo prebuild`.
+
+**Integration:**
+- **iOS:** `VehicleClassifierModule.swift` loads `.mlmodelc` (Xcode-compiled from `.mlpackage`) via `VNCoreMLRequest` with center-crop preprocessing.
+- **Android:** `VehicleClassifierModule.kt` loads `vehicle_classifier.tflite` from Android assets via TFLite `Interpreter` with GPU delegate.
+- Both modules return `{ make, model, generation, confidence }` and fall back to `VehicleClassifierStub` when unavailable (Expo Go / dev).
 
 ---
 
@@ -357,23 +379,28 @@ Backend vars → Railway service environment. Mobile vars → `eas env:create --
 
 ## Running Locally
 
+> **Windows note:** use `.venv\Scripts\activate` (not `source .venv/bin/activate`). Python 3.10 is required for the backend — use `py -3.10 -m venv .venv`.
+
 **Backend:**
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+py -3.10 -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
+Copy `.env.example` to `.env` and fill in `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` at minimum. All other vars have safe defaults for local dev.
 
 **Mobile:**
 ```bash
 cd mobile
-npm install --legacy-peer-deps
+npm install --legacy-peer-deps   # --legacy-peer-deps required due to peer dep conflicts
 npx expo start
 ```
 
 **Workers:**
 ```bash
+# from backend/ with venv active
 python workers/osm_seeder.py                              # seed road segments (14 cities)
 python workers/satellite_tracker.py                       # continuous pass computation
 python scripts/seed_ai_rivals.py --city Seoul --density 0.30
@@ -420,10 +447,11 @@ python scripts/seed_market.py                             # seed initial market 
 | AI rival Road Kings (seed script, ghost territory) | ✅ |
 | Privacy Shield (geometric overlay, Dash Sentry only) | ✅ |
 | Plate hash opt-in (on-device SHA-256, spotter award) | ✅ |
-| ML training pipeline (41 classes, early stopping, DuckDuckGo scraper) | ✅ |
+| ML training pipeline (63 classes, early stopping, DuckDuckGo scraper) | ✅ |
 | ONNX export | ✅ |
-| CoreML export (.mlpackage, Swift module) | ✅ macOS only |
-| TFLite Android classifier | 🔧 after iOS validated |
+| CoreML export (.mlpackage) + iOS Swift native module (VNCoreMLRequest) | ✅ |
+| TFLite float16 export + Android Kotlin native module (GPU delegate) | ✅ |
+| Model deploy script (zip + R2 upload + version bump) | ✅ |
 | Identify image sourcing (training data or public domain replacement for Reddit) | 🔧 in progress |
 | TestFlight + Play Store internal track | 🔧 soon |
 
@@ -431,4 +459,20 @@ python scripts/seed_market.py                             # seed initial market 
 
 ## CI
 
-EAS builds trigger automatically on every push to `main`. A `cancel-pending` job runs first and kills any `new`, `waiting`, or `in-progress` preview builds before queuing new ones — keeps the free-tier build queue clean.
+**On every push to `main`:**
+- `ci.yml` — backend ruff + mypy, mobile TypeScript check
+- `eas-build.yml` — cancels stale preview builds, then queues iOS + Android EAS preview builds
+
+**Required GitHub secrets** (in `grantl12/chadongcha-app` → Settings → Secrets):
+- `EXPO_TOKEN` — EAS authentication token (from expo.dev → Account Settings → Access Tokens)
+
+**Railway deployment** (3 services, all watching `grantl12/chadongcha-app`):
+- `railway.toml` → api service
+- `railway.sat.toml` → sat-worker service  
+- `railway.seeder.toml` → osm-seeder service
+- `MODEL_CURRENT_VERSION` is a Railway shared variable — update it after deploying a new model, then redeploy the api service
+
+**Notes:**
+- `npm ci --legacy-peer-deps` is required in CI — plain `npm ci` fails due to peer dep conflicts in the Expo/Mapbox/VisionCamera combination
+- Railway `startCommand` strings must use `sh -c '...'` to expand `$PORT`
+- Railway builds with repo root as Docker build context — all `COPY` paths in `backend/Dockerfile` are prefixed with `backend/`

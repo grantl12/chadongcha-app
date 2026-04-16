@@ -53,6 +53,8 @@ async def signup(body: SignUpRequest):
     # Immediately issue a session so the mobile client can skip the sign-in step.
     try:
         signin = db.auth.sign_in_with_password({"email": body.email, "password": body.password})
+        if signin.session is None:
+            return {"user_id": user_id}
         return {
             "user_id":       user_id,
             "access_token":  signin.session.access_token,

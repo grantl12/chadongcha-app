@@ -23,7 +23,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - run: npm install -g npm@11
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
@@ -53,12 +52,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - run: npm install -g npm@11
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
         working-directory: mobile
       - name: Verify EAS auth
         working-directory: mobile
@@ -78,12 +76,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - run: npm install -g npm@11
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
         working-directory: mobile
       - name: Verify EAS auth
         working-directory: mobile

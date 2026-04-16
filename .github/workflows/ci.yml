@@ -36,6 +36,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
+      - run: npm install -g npm@11
       - run: npm ci
       # Generate Expo Router typed-route declarations before tsc runs.
       # Without this, .expo/types/router.d.ts is missing (it's gitignored)

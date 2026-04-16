@@ -84,6 +84,15 @@ def notify_first_finder(db, player_id: str, badge_name: str, vehicle_name: str):
     )
 
 
+def notify_satellite_badge(db, player_id: str, badge_name: str, vehicle_name: str):
+    _send(
+        db, player_id,
+        title="Satellite Badge!",
+        body=f"You earned the {badge_name} badge for catching a {vehicle_name}.",
+        data={"type": "satellite_badge", "badge": badge_name},
+    )
+
+
 def notify_spotted(db, owner_id: str, spotter_username: str, city: str | None):
     """Tell a plate owner their car was spotted."""
     where = f" in {city}" if city else ""

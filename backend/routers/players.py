@@ -70,11 +70,32 @@ async def player_stats(player_id: str):
             "vehicle_name": vehicle,
         })
 
+    # Satellite badges
+    sat_res = db.table("satellite_badges") \
+        .select("awarded_at, generations(common_name, models(name, makes(name)))") \
+        .eq("player_id", player_id) \
+        .order("awarded_at", desc=True) \
+        .execute()
+    
+    satellite_badges = []
+    for sat in (sat_res.data or []):
+        gen = sat.get("generations") or {}
+        model = gen.get("models") or {}
+        make = (model.get("makes") or {}).get("name", "")
+        model_name = model.get("name", "")
+        vehicle = gen.get("common_name") or f"{make} {model_name}".strip() or "Unknown"
+        satellite_badges.append({
+            "badge_name": f"Satellite Star: {vehicle}",
+            "awarded_at": sat["awarded_at"],
+            "vehicle_name": vehicle
+        })
+
     return {
         "total_catches":  total_catches,
         "catches_by_rarity": by_rarity,
         "road_king_count": road_king_count,
         "first_finder_badges": badges,
+        "satellite_badges": satellite_badges,
     }
 
 

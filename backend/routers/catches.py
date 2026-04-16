@@ -8,11 +8,13 @@ from config import settings
 from services.xp_service import compute_xp, apply_xp, session_catch_count, get_orbital_boost, ROAD_KING_TAKEOVER_XP, ORBITAL_BOOST_MULTIPLIERS
 from services.territory_service import record_road_scan
 from services.first_finder_service import check_first_finder
+from services.satellite_badge_service import award_satellite_badge
 from services import feed_service
 from services.notification_service import (
     notify_road_king_taken, notify_road_king_claimed,
     notify_level_up, notify_first_finder,
     notify_spotted, notify_spotter_award,
+    notify_satellite_badge,
 )
 
 SPOTTER_XP = 150   # bonus XP for catching a registered plate
@@ -303,6 +305,13 @@ async def ingest_catch(
         )
         if first_finder_awarded:
             notify_first_finder(db, player_id, first_finder_awarded.get("badge", ""), vehicle_name or "")
+
+    # Satellite Badge
+    satellite_badge_awarded = None
+    if body.catch_type == "space" and body.generation_id:
+        satellite_badge_awarded = award_satellite_badge(db, player_id, body.generation_id, catch_id)
+        if satellite_badge_awarded:
+            notify_satellite_badge(db, player_id, satellite_badge_awarded["badge_name"], vehicle_name or "")
 
     # ── Activity feed events ──────────────────────────────────────────────────
     # catch event — written for every non-duplicate catch

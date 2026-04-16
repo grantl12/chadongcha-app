@@ -1,13 +1,13 @@
 /**
- * Identify — Reddit ID mini-game.
- * Shows a photo from r/whatisthiscar with 4 multiple-choice options.
+ * Identify — vehicle ID mini-game.
+ * Shows a mystery car photo with 4 multiple-choice options OR a text entry field.
  * Correct guess → XP (orbital boost applies).
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Image,
-  ActivityIndicator, ScrollView,
+  ActivityIndicator, ScrollView, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -18,8 +18,10 @@ import { usePlayerStore } from '@/stores/playerStore';
 type IdCard = {
   id: string;
   imageUrl: string;
-  redditAuthor: string | null;
+  author: string | null;
   options: string[];
+  isTextEntry: boolean;
+  source: 'scraped' | 'community';
 };
 
 type GuessResult = {
@@ -32,26 +34,27 @@ type GuessResult = {
 
 export default function IdentifyScreen() {
   const queryClient = useQueryClient();
-  const applyXp     = usePlayerStore(s => s.applyXp);
   const setProfile  = usePlayerStore(s => s.setProfile);
 
   const [cardIndex, setCardIndex]   = useState(0);
+  const [guessText, setGuessText]   = useState('');
   const [result, setResult]         = useState<GuessResult & { guessed: string } | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   const { data: cards = [], isLoading, isError } = useQuery<IdCard[]>({
-    queryKey: ['reddit-queue'],
-    queryFn:  () => apiClient.get('/community/reddit-queue?limit=10') as Promise<IdCard[]>,
+    queryKey: ['identify-queue'],
+    queryFn:  () => apiClient.get('/community/identify-queue?limit=10') as Promise<IdCard[]>,
     staleTime: 5 * 60 * 1000,
   });
 
   const guessMutation = useMutation({
-    mutationFn: ({ queueItemId, guessedLabel }: { queueItemId: string; guessedLabel: string }) =>
-      apiClient.post('/community/reddit-guess', {
-        queue_item_id: queueItemId,
-        guessed_label: guessedLabel,
+    mutationFn: ({ cardId, guess }: { cardId: string; guess: string }) =>
+      apiClient.post('/community/identify-guess', {
+        card_id: cardId,
+        guess: guess,
       }) as Promise<GuessResult>,
     onSuccess(data, variables) {
-      setResult({ ...data, guessed: variables.guessedLabel });
+      setResult({ ...data, guessed: variables.guess });
       setProfile(data.new_total_xp, data.new_level);
       if (data.correct) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -61,18 +64,19 @@ export default function IdentifyScreen() {
     },
   });
 
-  function handleGuess(card: IdCard, option: string) {
-    if (result || guessMutation.isPending) return;
+  function handleGuess(card: IdCard, option?: string) {
+    const finalGuess = option || guessText;
+    if (!finalGuess.trim() || result || guessMutation.isPending) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    guessMutation.mutate({ queueItemId: card.id, guessedLabel: option });
+    guessMutation.mutate({ cardId: card.id, guess: finalGuess });
   }
 
   function handleNext() {
     setResult(null);
+    setGuessText('');
     guessMutation.reset();
     if (cardIndex + 1 >= cards.length) {
-      // Refetch for more cards
-      queryClient.invalidateQueries({ queryKey: ['reddit-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['identify-queue'] });
       setCardIndex(0);
     } else {
       setCardIndex(i => i + 1);
@@ -82,7 +86,10 @@ export default function IdentifyScreen() {
   const card = cards[cardIndex];
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
@@ -133,9 +140,9 @@ export default function IdentifyScreen() {
               </View>
             )}
             {/* Attribution */}
-            {card.redditAuthor && (
+            {card.author && (
               <View style={styles.attribution}>
-                <Text style={styles.attributionText}>📷 u/{card.redditAuthor} · r/whatisthiscar</Text>
+                <Text style={styles.attributionText}>📷 {card.source === 'community' ? 'Community' : 'Archive'} · {card.author}</Text>
               </View>
             )}
           </View>
@@ -143,37 +150,67 @@ export default function IdentifyScreen() {
           {/* Prompt */}
           <Text style={styles.prompt}>WHAT IS THIS CAR?</Text>
 
-          {/* Options */}
-          <View style={styles.options}>
-            {card.options.map(option => {
-              const isGuessed  = result?.guessed === option;
-              const isCorrect  = result?.correct_label === option;
-              const showRight  = !!result && isCorrect;
-              const showWrong  = !!result && isGuessed && !result.correct;
-
-              return (
-                <Pressable
-                  key={option}
-                  style={[
-                    styles.option,
-                    showRight && styles.optionCorrect,
-                    showWrong && styles.optionWrong,
-                    !!result && !showRight && !showWrong && styles.optionDim,
-                  ]}
-                  onPress={() => handleGuess(card, option)}
-                  disabled={!!result || guessMutation.isPending}
+          {/* Options / Text Entry */}
+          {card.isTextEntry ? (
+            <View style={styles.textEntryWrap}>
+              <TextInput
+                ref={inputRef}
+                style={[
+                  styles.input,
+                  !!result && !result.correct && styles.inputWrong,
+                  !!result && result.correct && styles.inputCorrect,
+                ]}
+                placeholder="Type your guess..."
+                placeholderTextColor="#444"
+                value={guessText}
+                onChangeText={setGuessText}
+                autoCorrect={false}
+                autoCapitalize="words"
+                editable={!result && !guessMutation.isPending}
+                onSubmitEditing={() => handleGuess(card)}
+              />
+              {!result && (
+                <Pressable 
+                  style={[styles.submitBtn, !guessText.trim() && styles.submitBtnDisabled]} 
+                  onPress={() => handleGuess(card)}
+                  disabled={!guessText.trim() || guessMutation.isPending}
                 >
-                  <Text style={[
-                    styles.optionText,
-                    showRight && styles.optionTextCorrect,
-                    showWrong && styles.optionTextWrong,
-                  ]}>
-                    {option}
-                  </Text>
+                  <Text style={styles.submitBtnText}>GUESS</Text>
                 </Pressable>
-              );
-            })}
-          </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.options}>
+              {card.options.map(option => {
+                const isGuessed  = result?.guessed === option;
+                const isCorrect  = result?.correct_label === option;
+                const showRight  = !!result && isCorrect;
+                const showWrong  = !!result && isGuessed && !result.correct;
+
+                return (
+                  <Pressable
+                    key={option}
+                    style={[
+                      styles.option,
+                      showRight && styles.optionCorrect,
+                      showWrong && styles.optionWrong,
+                      !!result && !showRight && !showWrong && styles.optionDim,
+                    ]}
+                    onPress={() => handleGuess(card, option)}
+                    disabled={!!result || guessMutation.isPending}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      showRight && styles.optionTextCorrect,
+                      showWrong && styles.optionTextWrong,
+                    ]}>
+                      {option}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
 
           {/* Reveal answer if wrong */}
           {result && !result.correct && (
@@ -193,7 +230,7 @@ export default function IdentifyScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -224,6 +261,14 @@ const styles = StyleSheet.create({
   attributionText:     { color: 'rgba(255,255,255,0.45)', fontSize: 10 },
 
   prompt:              { color: '#333', fontSize: 11, fontWeight: '800', letterSpacing: 3, marginBottom: 14 },
+
+  textEntryWrap:       { gap: 12 },
+  input:               { backgroundColor: '#141414', borderWidth: 1, borderColor: '#222', borderRadius: 10, paddingVertical: 16, paddingHorizontal: 20, color: '#fff', fontSize: 16, fontWeight: '600' },
+  inputCorrect:        { borderColor: '#22c55e', color: '#22c55e' },
+  inputWrong:          { borderColor: '#e63946', color: '#e63946' },
+  submitBtn:           { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
+  submitBtnDisabled:   { opacity: 0.2 },
+  submitBtnText:       { color: '#000', fontWeight: '900', fontSize: 14, letterSpacing: 2 },
 
   options:             { gap: 10 },
   option:              { backgroundColor: '#141414', borderWidth: 1, borderColor: '#222', borderRadius: 10, paddingVertical: 16, paddingHorizontal: 20 },

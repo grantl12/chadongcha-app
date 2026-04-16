@@ -1,0 +1,12 @@
+**/node_modules/**
+**/.git/**
+**/.gitignore
+**/android/**
+**/ios/**
+**/.expo/**
+**/.mypy_cache/**
+**/.ruff_cache/**
+**/__pycache__/**
+**/.venv*/**
+**/*.log
+**/*.swp

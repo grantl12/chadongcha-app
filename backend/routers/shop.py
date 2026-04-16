@@ -125,7 +125,7 @@ async def buy_item(body: BuyRequest, authorization: str = Header(...)):
     refreshed = db.table("players") \
         .select("credits, xp_boost_expires, scan_boost_expires, id_hints") \
         .eq("id", player_id).maybe_single().execute()
-    r = refreshed.data or {}
+    r = (refreshed.data if refreshed else None) or {}
 
     return {
         "ok":                 True,

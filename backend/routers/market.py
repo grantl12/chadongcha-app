@@ -465,7 +465,7 @@ async def sell_to_wholesaler(body: dict, authorization: str = Header(...)):
 
     # Return new credit total
     player = db.table("players").select("credits").eq("id", player_id).maybe_single().execute()
-    new_total = (player.data or {}).get("credits", 0)
+    new_total = ((player.data if player else None) or {}).get("credits", 0)
 
     return {
         "ok":           True,

@@ -30,7 +30,7 @@ export default function JoinCrewScreen() {
       // Update player store with new crewId if available from backend response
       // In a real app, you'd likely fetch player profile again or get ID from response
       // For now, just navigate back to the crew hub.
-      router.replace('/crew');
+      router.replace('/crew/index');
     },
     onError: (error) => {
       console.error("Failed to join crew:", error);

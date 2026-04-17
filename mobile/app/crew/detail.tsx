@@ -27,7 +27,7 @@ export default function CrewDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       queryClient.invalidateQueries({ queryKey: ['crew'] });
       queryClient.invalidateQueries({ queryKey: ['crews-list'] });
-      router.replace('/crew');
+      router.replace('/crew/index');
     },
     onError: (error: Error) => {
       console.error("Failed to leave crew:", error);
@@ -41,7 +41,7 @@ export default function CrewDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       queryClient.invalidateQueries({ queryKey: ['crew'] });
       queryClient.invalidateQueries({ queryKey: ['crews-list'] });
-      router.replace('/crew');
+      router.replace('/crew/index');
     },
     onError: (error: Error) => {
       console.error("Failed to disband crew:", error);

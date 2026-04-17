@@ -28,7 +28,7 @@ export default function CreateCrewScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['crew'] });
       queryClient.invalidateQueries({ queryKey: ['crews-list'] });
-      router.replace('/crew');
+      router.replace('/crew/index');
     }
   });
 

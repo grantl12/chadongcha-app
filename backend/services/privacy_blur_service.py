@@ -9,7 +9,6 @@ Called as a background task before a community photo is marked photo_shared=True
 Non-fatal — failures are logged but never block the catch response.
 """
 
-import io
 import logging
 import numpy as np
 

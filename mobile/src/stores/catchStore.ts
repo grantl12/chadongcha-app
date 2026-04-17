@@ -134,7 +134,8 @@ export const useCatchStore = create<CatchStore>()(
 
             // Upload scan photo to R2 if the user has opted in.
             // For scan360, use the FRONT photo (photoPaths[0]) as the community image.
-            const uploadCandidate = catch_.photoPath ?? catch_.photoPaths?.[0] ?? null;
+            // Prefer the permanent saved path; photoPath is a temp VisionCamera cache path that can be evicted.
+            const uploadCandidate = catch_.photoPaths?.[0] ?? catch_.photoPath ?? null;
             let photoRef = catch_.photoRef ?? null;
             if (!photoRef && uploadCandidate) {
               const { contributeScans } = useSettingsStore.getState();

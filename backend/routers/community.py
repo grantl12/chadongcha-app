@@ -228,11 +228,17 @@ def _display_label(class_str: str) -> str:
 async def identify_queue(limit: int = 5, authorization: str = Header(...)):
     db = get_client()
     player_id = _resolve_player(db, authorization)
-    seen_res = db.table("id_game_guesses").select("card_id").eq("player_id", player_id).execute()
-    seen_ids = [r["card_id"] for r in (seen_res.data or [])]
-    query = db.table("id_game_queue").select("id, image_url, author_username, answer_class, answer_label, body_style, is_text_entry, source").eq("status", "active").order("created_at", desc=False).limit(limit + len(seen_ids))
-    res = query.execute()
-    rows = [r for r in (res.data or []) if r["id"] not in seen_ids][:limit]
+    # Only skip cards the player already got *correct* — wrong guesses cycle back for retry.
+    correct_res = db.table("id_game_guesses").select("card_id").eq("player_id", player_id).eq("correct", True).execute()
+    solved_ids = {r["card_id"] for r in (correct_res.data or [])}
+    all_res = db.table("id_game_queue").select("id, image_url, author_username, answer_class, answer_label, body_style, is_text_entry, source").eq("status", "active").order("created_at", desc=False).execute()
+    all_rows = all_res.data or []
+    rows = [r for r in all_rows if r["id"] not in solved_ids]
+    # If the player has mastered every card, recycle the full deck.
+    if not rows:
+        rows = all_rows
+    random.shuffle(rows)
+    rows = rows[:limit]
     cards = []
     for r in rows:
         options = []

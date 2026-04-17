@@ -29,7 +29,12 @@
       "Bash(.venv/Scripts/mypy . --ignore-missing-imports --exclude workers/)",
       "Bash(.venv/Scripts/ruff check *)",
       "Bash(tasklist /fi \"imagename eq python.exe\" /fo list)",
-      "Bash(tasklist /fi \"imagename eq node.exe\" /fo list)"
+      "Bash(tasklist /fi \"imagename eq node.exe\" /fo list)",
+      "Bash(cmd *)",
+      "Bash(powershell *)",
+      "Bash(python *)",
+      "Bash(/c/Windows/System32/cmd.exe *)",
+      "Bash(\"D:/Users/grant/Documents/ChaDongCha/ml/.venv310/Scripts/python.exe\" training/scrape_images.py)"
     ]
   }
 }

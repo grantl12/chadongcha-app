@@ -38,10 +38,16 @@ def activate_boost(body: ActivatePayload, authorization: str = Header(...)):
     Sets players.orbital_boost_expires_at to now + duration for the given rarity.
     Returns the new expiry + remaining minutes.
     """
+    if body.rarity_tier not in ORBITAL_BOOST_MULTIPLIERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid rarity_tier '{body.rarity_tier}'. Must be one of: {sorted(ORBITAL_BOOST_MULTIPLIERS)}",
+        )
+
     db = get_client()
     player_id = _auth(db, authorization)
 
-    multiplier, duration_min = ORBITAL_BOOST_MULTIPLIERS.get(body.rarity_tier, (1.25, 20))
+    multiplier, duration_min = ORBITAL_BOOST_MULTIPLIERS[body.rarity_tier]
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=duration_min)
 
     db.table("players").update({

@@ -13,6 +13,8 @@ import {
   type ClassifyResult,
 } from '@/modules/vehicle-classifier';
 
+type DetectionState = 'idle' | 'scanning' | 'probable' | 'caught';
+
 // Use native CoreML module if available, else fall back to stub.
 const Classifier = VehicleClassifier ?? VehicleClassifierStub;
 
@@ -85,6 +87,32 @@ function RadarDot({ boostActive, catchFlash }: { boostActive: boolean; catchFlas
   );
 }
 
+const BRACKET_LEG   = 22;
+const BRACKET_INSET = 44;
+
+function SentryOverlay({ state }: { state: DetectionState }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const target = state === 'caught' ? 1 : state === 'probable' ? 0.6 : 0;
+    Animated.timing(anim, { toValue: target, duration: 200, useNativeDriver: false }).start();
+  }, [state]);
+
+  const color = anim.interpolate({
+    inputRange: [0, 0.6, 1],
+    outputRange: ['#ffffff22', '#f59e0b', '#22c55e'],
+  });
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Animated.View style={[styles.bkt, styles.bktTL, { borderColor: color }]} />
+      <Animated.View style={[styles.bkt, styles.bktTR, { borderColor: color }]} />
+      <Animated.View style={[styles.bkt, styles.bktBL, { borderColor: color }]} />
+      <Animated.View style={[styles.bkt, styles.bktBR, { borderColor: color }]} />
+    </View>
+  );
+}
+
 export default function DashSentry() {
   const device = useCameraDevice('back');
   const cameraRef = useRef<Camera>(null);
@@ -106,6 +134,9 @@ export default function DashSentry() {
   const [catchBanner, setCatchBanner] = useState<string | null>(null);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [detectionState, setDetectionState] = useState<DetectionState>('idle');
+  const detectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const isMoving = speedMph > SPEED_THRESHOLD_MPH;
 
   // ── Classify loop — snapshot every 500ms, run CoreML, handle result ─────────
@@ -115,18 +146,30 @@ export default function DashSentry() {
     const timer = setInterval(async () => {
       if (classifyingRef.current || !cameraRef.current) return;
       classifyingRef.current = true;
+      setDetectionState('scanning');
       try {
         const snapshot = await cameraRef.current.takeSnapshot({ quality: 85 });
         const result   = await Classifier.classify(snapshot.path);
-        if (!result || result.make === '_Background') return;
+
+        if (!result || result.make === '_Background') {
+          setDetectionState('idle');
+          return;
+        }
 
         if (result.confidence >= autoCatchThreshold) {
+          setDetectionState('caught');
+          scheduleDetectionReset(3500);
           handleCatch(result);
         } else if (result.confidence >= probableThreshold) {
+          setDetectionState('probable');
+          scheduleDetectionReset(2000);
           handleProbable(result);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } else {
+          setDetectionState('idle');
         }
       } catch {
-        // Camera not ready or classify failed — silently skip this frame
+        setDetectionState('idle');
       } finally {
         classifyingRef.current = false;
       }
@@ -134,6 +177,11 @@ export default function DashSentry() {
 
     return () => clearInterval(timer);
   }, [safetyConfirmed]);
+
+  const scheduleDetectionReset = useCallback((delay: number) => {
+    if (detectionTimer.current) clearTimeout(detectionTimer.current);
+    detectionTimer.current = setTimeout(() => setDetectionState('idle'), delay);
+  }, []);
 
   const handleCatch = useCallback((result: ClassifyResult) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -180,6 +228,8 @@ export default function DashSentry() {
           photo={false}
           video={false}
         />
+
+        <SentryOverlay state={detectionState} />
 
         {/* Safety banner — always visible */}
         <View style={styles.safetyBanner}>
@@ -244,6 +294,12 @@ const styles = StyleSheet.create({
   boostPillText:    { color: '#f59e0b', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   scanBoostPill:    { top: 96, backgroundColor: '#001a1a88', borderColor: '#4a9eff88' },
   scanBoostPillText:{ color: '#4a9eff', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+
+  bkt:    { position: 'absolute', width: BRACKET_LEG, height: BRACKET_LEG, borderWidth: 2 },
+  bktTL:  { top: BRACKET_INSET,  left: BRACKET_INSET,  borderRightWidth: 0, borderBottomWidth: 0 },
+  bktTR:  { top: BRACKET_INSET,  right: BRACKET_INSET, borderLeftWidth: 0,  borderBottomWidth: 0 },
+  bktBL:  { bottom: BRACKET_INSET, left: BRACKET_INSET,  borderRightWidth: 0, borderTopWidth: 0 },
+  bktBR:  { bottom: BRACKET_INSET, right: BRACKET_INSET, borderLeftWidth: 0,  borderTopWidth: 0 },
 
   interstitialOverlay:    { flex: 1, backgroundColor: '#000000cc', alignItems: 'center', justifyContent: 'center', padding: 32 },
   interstitialCard:       { backgroundColor: '#111', borderRadius: 16, padding: 28, alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#222' },

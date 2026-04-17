@@ -204,7 +204,7 @@ def scrape_car(ddgs, car: dict, seen_hashes: set, sql_f) -> int:
                     max_results=20,
                     type_image="photo",
                     size="medium",
-                    safe="off", # Allow all images, filter by size/quality later
+                    safesearch="off",
                     # No explicit user-agent setting in DDGS library, relying on requests header
                 ))
                 results = search_results

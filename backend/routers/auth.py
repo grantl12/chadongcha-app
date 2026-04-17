@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel, EmailStr
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from db import get_client
 
 router = APIRouter()
+_limiter = Limiter(key_func=get_remote_address)
 
 
 class SignUpRequest(BaseModel):
@@ -17,7 +20,8 @@ class SignInRequest(BaseModel):
 
 
 @router.post("/signup")
-async def signup(body: SignUpRequest):
+@_limiter.limit("5/minute")
+async def signup(request: Request, body: SignUpRequest):
     db = get_client()
 
     # Create a pre-confirmed user via the admin API — no verification email,
@@ -66,7 +70,8 @@ async def signup(body: SignUpRequest):
 
 
 @router.post("/signin")
-async def signin(body: SignInRequest):
+@_limiter.limit("10/minute")
+async def signin(request: Request, body: SignInRequest):
     db = get_client()
     try:
         result = db.auth.sign_in_with_password({"email": body.email, "password": body.password})
@@ -118,6 +123,25 @@ async def me_info(authorization: str = Header(...)):
 
 class PushTokenRequest(BaseModel):
     expo_push_token: str
+
+
+@router.delete("/account")
+async def delete_account(authorization: str = Header(...)):
+    db = get_client()
+    token = authorization.replace("Bearer ", "")
+    try:
+        auth_result = db.auth.get_user(token)
+        if not auth_result or not auth_result.user:
+            raise ValueError()
+        player_id = auth_result.user.id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    try:
+        db.table("players").delete().eq("id", player_id).execute()
+        db.auth.admin.delete_user(player_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Account deletion failed: {e}")
+    return {"ok": True}
 
 
 @router.post("/push-token")

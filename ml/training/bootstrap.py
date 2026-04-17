@@ -91,14 +91,54 @@ GENERATION_CLASSES = [
     "BMW S1000RR K67",
     # ── Vans ─────────────────────────────────────────────────────────────────
     "Honda Odyssey RL6",
-    # ── EVs ──────────────────────────────────────────────────────────────────
-    "Tesla Model_S Plaid",
-    "Tesla Model_3 Highland",
-    "Tesla Model_Y JY",
-    "Tesla Model_X GX",
-    "Tesla Cybertruck",
+    "Toyota Sienna 4th Gen",
+    "2000 Toyota Sienna Van",
+    "Chrysler Pacifica",
+    "Kia Carnival",
+    # ── Hybrid / EV common ───────────────────────────────────────────────────
+    "Toyota Prius 4th Gen",
+    "Toyota Prius Prime",
+    "Nissan LEAF 2nd Gen",
+    "Chevrolet Bolt EV",
+    "Volkswagen ID.4",
+    "Ford Mustang Mach-E",
+    # ── Entry-level luxury sedans ────────────────────────────────────────────
+    "Lexus ES 350 7th Gen",
+    "Cadillac CT5",
+    "Acura TLX 2nd Gen",
+    "Infiniti Q50",
+    "Volvo S60 3rd Gen",
+    "Genesis G70 2nd Gen",
+    # ── Entry-level luxury SUVs ──────────────────────────────────────────────
+    "BMW X3 G01",
+    "Mercedes GLC W253",
+    "Audi Q5 2nd Gen",
+    "Lexus RX 500h",
+    "Cadillac XT5",
+    "Acura MDX 4th Gen",
+    "Infiniti QX60 3rd Gen",
+    "Volvo XC60 2nd Gen",
+    "Genesis GV70",
+    "Lincoln Corsair",
+    # ── Public service / working fleet ──────────────────────────────────────
+    "School Bus",
+    "City Transit Bus",
+    "Garbage Truck",
+    "Recycling Truck",
+    "Police Explorer",
+    "Police Charger",
+    "Police Tahoe",
+    "Fire Engine",
+    "Ladder Truck",
+    "Ambulance",
+    "USPS Mail Truck",
+    "UPS Delivery Truck",
+    "FedEx Truck",
+    "Amazon Delivery Van",
+    "Tow Truck",
+    "Street Sweeper",
     # ── Background / negative class ─────────────────────────────────────────
-    "_Background",
+    "_Background"
 ]
 
 
@@ -266,10 +306,12 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
             )
 
         if epochs_no_improve >= patience:
-            print(f"\nEarly stopping — val_acc has not improved for {patience} consecutive epochs.")
+            print(f"
+Early stopping — val_acc has not improved for {patience} consecutive epochs.")
             break
 
-    print(f"\nTraining complete.  Best val acc: {best_acc:.3f}")
+    print(f"
+Training complete.  Best val acc: {best_acc:.3f}")
     print(f"Checkpoint: {MODELS_DIR / 'best.pt'}")
     print(f"To keep training: python training/bootstrap.py --phase classify --epochs N --resume")
 
@@ -327,7 +369,8 @@ def phase_export():
     # ------------------------------------------------------------------
     try:
         import coremltools as ct
-        print("\nExporting to CoreML…")
+        print("
+Exporting to CoreML…")
         traced = torch.jit.trace(model, dummy)
         coreml_model = ct.convert(
             traced,
@@ -352,12 +395,14 @@ def phase_export():
         coreml_model.save(str(coreml_path))
         print(f"CoreML saved → {coreml_path}")
     except (ImportError, RuntimeError, Exception) as e:
-        print(f"\nSkipping CoreML export (not supported on this platform: {e})")
+        print(f"
+Skipping CoreML export (not supported on this platform: {e})")
 
     # ------------------------------------------------------------------
     # ONNX (TFLite conversion path — run onnx2tf or ai_edge_torch separately)
     # ------------------------------------------------------------------
-    print("\nExporting to ONNX…")
+    print("
+Exporting to ONNX…")
     try:
         import onnx  # noqa: F401
         onnx_path = EXPORT_DIR / "vehicle_classifier.onnx"
@@ -388,8 +433,10 @@ def phase_export():
     }
     manifest_path = EXPORT_DIR / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
-    print(f"\nManifest → {manifest_path}")
-    print("\nExport complete.")
+    print(f"
+Manifest → {manifest_path}")
+    print("
+Export complete.")
 
 
 if __name__ == "__main__":

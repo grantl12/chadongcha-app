@@ -265,9 +265,15 @@ export default function Scan360Screen() {
         </View>
       )}
 
-      {!result && !classifying && isReady && (
+      {!result && !classifying && isReady && !lowConfidence && (
         <Pressable style={styles.captureButton} onPress={captureAnchor}>
           <View style={styles.captureInner} />
+        </Pressable>
+      )}
+
+      {lowConfidence && !classifying && (
+        <Pressable style={styles.retryButton} onPress={() => setLowConfidence(false)}>
+          <Text style={styles.retryText}>TRY AGAIN</Text>
         </Pressable>
       )}
 
@@ -318,6 +324,8 @@ const styles = StyleSheet.create({
 
   captureButton:    { position: 'absolute', bottom: 80, alignSelf: 'center', width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   captureInner:     { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
+  retryButton:      { position: 'absolute', bottom: 80, alignSelf: 'center', backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#555', borderRadius: 36, paddingVertical: 18, paddingHorizontal: 32 },
+  retryText:        { color: '#fff', fontWeight: '900', fontSize: 13, letterSpacing: 3 },
 
   readyOverlay:     { position: 'absolute', bottom: 140, left: 24, right: 24, alignItems: 'center' },
   readyText:        { color: '#ffffff88', fontSize: 12, fontWeight: '700', letterSpacing: 3, textAlign: 'center' },

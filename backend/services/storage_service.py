@@ -55,3 +55,24 @@ def public_url(key: str) -> str:
     """Build the public CDN URL for a stored R2 object."""
     base = settings.r2_public_url.rstrip("/")
     return f"{base}/{key}"
+
+
+def download_from_r2(key: str) -> bytes | None:
+    """Download an object from R2. Returns raw bytes or None on failure."""
+    try:
+        client = _get_client()
+        response = client.get_object(Bucket=settings.r2_bucket_assets, Key=key)
+        return response["Body"].read()
+    except Exception:
+        return None
+
+
+def upload_bytes_to_r2(data: bytes, key: str, content_type: str = "image/jpeg") -> None:
+    """Upload raw bytes to R2 at the given key (overwrites if exists)."""
+    client = _get_client()
+    client.put_object(
+        Bucket=settings.r2_bucket_assets,
+        Key=key,
+        Body=data,
+        ContentType=content_type,
+    )

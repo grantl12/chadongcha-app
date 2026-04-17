@@ -103,12 +103,18 @@ class CatchPayload(BaseModel):
 
 async def _moderate_photo_bg(photo_key: str, unknown_catch_id: str) -> None:
     """
-    BackgroundTask: run SafeSearch on the submitted photo and update
-    unknown_catches.photo_shared + moderation_status accordingly.
-    Non-fatal — any exception is swallowed (logged inside moderation_service).
+    BackgroundTask: blur faces/plates then run content moderation on the photo.
+    Updates unknown_catches.photo_shared + moderation_status.
+    Non-fatal — failures are logged but never surface to the player.
     """
+    from services.privacy_blur_service import blur_photo_in_place
     from services.moderation_service import check_photo, ModerationResult
     db = get_client()
+
+    # Step 1: Privacy blur — must happen before photo is ever community-visible
+    await blur_photo_in_place(photo_key)
+
+    # Step 2: Content moderation (SKIPPED until moderation service is configured)
     result = await check_photo(settings.r2_public_url, photo_key)
     approved = result in (ModerationResult.APPROVED, ModerationResult.SKIPPED)
     try:

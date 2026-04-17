@@ -23,10 +23,13 @@ from io import BytesIO
 from pathlib import Path
 
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 except ImportError:
-    print("Missing dependency: pip install duckduckgo_search requests Pillow")
-    sys.exit(1)
+    try:
+        from duckduckgo_search import DDGS
+    except ImportError:
+        print("Missing dependency: pip install ddgs requests Pillow")
+        sys.exit(1)
 
 try:
     import requests
@@ -45,7 +48,7 @@ log = logging.getLogger(__name__)
 _DEFAULT_DATA_DIR = Path(__file__).parent.parent / "data" / "images"
 DATA_DIR          = _DEFAULT_DATA_DIR   # overridden by --data-dir arg
 STATS_FILE        = DATA_DIR.parent / "scrape_stats.json"
-IMAGES_PER_CLASS = 150
+IMAGES_PER_CLASS = 170
 MIN_IMAGE_SIZE   = 224
 MAX_IMAGE_SIZE   = 1024
 
@@ -384,6 +387,47 @@ CLASS_QUERIES = {
         "indoor room furniture no vehicle",
         "sky clouds outdoor photo",
         "trees forest path no vehicles",
+        "empty highway no cars aerial view",
+        "concrete floor ground texture close up",
+        "shopping mall interior no vehicle",
+        "office building lobby interior",
+        "mountain landscape nature photo",
+        "ocean beach sand waves no vehicle",
+        "city skyline buildings no cars",
+        "airport terminal interior photo",
+        "train station platform people",
+        "construction site dirt road no car",
+        "basketball court playground outdoor",
+        "park bench garden path photo",
+        "alley bricks cobblestone no car",
+        "rain puddle wet street reflection",
+        "desert sand dunes landscape",
+        "snow covered ground winter path",
+        "rooftop buildings urban aerial photo",
+        "tunnel interior dark no car",
+        "river stream water nature outdoor",
+        "stadium seats crowd sports arena",
+        "warehouse interior shelves no vehicle",
+        "pedestrian crosswalk people walking",
+        "fog misty road empty no cars",
+        "field farmland agriculture no vehicle",
+        "night street lights glow no cars",
+        "residential driveway empty no car",
+        "rocky terrain trail path outdoor",
+        "subway station platform metro",
+        "restaurant interior tables chairs",
+        "supermarket aisle grocery store",
+        "dog cat pet animal outdoor photo",
+        "bicycle parked sidewalk no car",
+        "flower garden backyard patio",
+        "fence wooden metal outdoor photo",
+        "graffiti wall urban art street",
+    ],
+    "2000 Toyota Sienna Van": [
+        "2000 Toyota Sienna minivan exterior side view",
+        "Toyota Sienna 1998 1999 2000 first gen street photo",
+        "Sienna XCE10 minivan 2000 2001 real photo",
+        "2000 2001 Toyota Sienna van outdoor side view",
     ],
     # ── Trucks (additional) ─────────────────────────────────────────────────
     "Ram 1500 DT": [
@@ -447,6 +491,614 @@ CLASS_QUERIES = {
         "BMW S1000RR 2019 2020 2021 motorcycle photo",
         "S1000RR M package real photo",
     ],
+
+    # ── Common compact / economy ───────────────────────────────────────────
+    "Toyota Corolla 12th Gen": [
+        "Toyota Corolla 2019 2020 12th generation exterior",
+        "Corolla sedan 2019 2020 street photo side view",
+        "Toyota Corolla 2021 2022 real photo outdoor",
+        "Corolla E210 sedan side view photo",
+    ],
+    "Hyundai Elantra": [
+        "Hyundai Elantra 2021 CN7 exterior side view",
+        "Elantra sedan 2021 2022 street photo",
+        "Hyundai Elantra 2021 real photo outdoor",
+        "Elantra 2022 2023 sedan side view",
+    ],
+    "Kia Forte": [
+        "Kia Forte 2019 sedan exterior side view",
+        "Forte BD 2019 2020 street photo real",
+        "Kia Forte 2021 2022 sedan outdoor photo",
+        "Forte sedan side view 2020 real photo",
+    ],
+    "Nissan Sentra": [
+        "Nissan Sentra 2020 eighth gen exterior",
+        "Sentra B18 sedan 2020 2021 street photo",
+        "Nissan Sentra 2021 2022 real photo side",
+        "Sentra sedan outdoor photo 2022",
+    ],
+    "Volkswagen Jetta": [
+        "Volkswagen Jetta 2019 MK7 exterior side view",
+        "VW Jetta 2019 2020 sedan street photo",
+        "Volkswagen Jetta 2021 2022 real photo outdoor",
+        "Jetta sedan side view photo 2022",
+    ],
+    "Subaru Impreza": [
+        "Subaru Impreza 2017 5th gen hatchback exterior",
+        "Impreza hatchback 2018 2019 street photo",
+        "Subaru Impreza sedan 2020 2021 real photo",
+        "Impreza GK GT side view photo outdoor",
+    ],
+    "Toyota Yaris": [
+        "Toyota Yaris 2020 hatchback exterior side view",
+        "Yaris XP210 hatchback 2020 2021 street photo",
+        "Toyota Yaris 2020 real photo outdoor",
+        "Yaris hatchback sedan side view photo",
+    ],
+    "Honda Fit": [
+        "Honda Fit 2018 Jazz hatchback exterior",
+        "Fit GK hatchback 2018 2019 street photo",
+        "Honda Fit Jazz 2019 2020 real photo outdoor",
+        "Fit hatchback side view photo",
+    ],
+    "Hyundai Accent": [
+        "Hyundai Accent 2018 RB sedan exterior",
+        "Accent sedan 2018 2019 street photo side",
+        "Hyundai Accent 2020 2021 real photo outdoor",
+        "Accent sedan side view photo 2019",
+    ],
+    "Kia Rio": [
+        "Kia Rio 2017 sedan hatchback exterior",
+        "Rio YB sedan 2017 2018 street photo",
+        "Kia Rio 2019 2020 real photo outdoor",
+        "Rio sedan side view photo 2020",
+    ],
+    "Chevrolet Spark": [
+        "Chevrolet Spark 2016 hatchback exterior",
+        "Spark M400 hatchback 2016 2017 street photo",
+        "Chevrolet Spark 2019 2020 real photo outdoor",
+        "Spark minicar side view photo",
+    ],
+    "Nissan Versa": [
+        "Nissan Versa 2020 sedan exterior side view",
+        "Versa N18 sedan 2020 2021 street photo",
+        "Nissan Versa 2021 2022 real photo outdoor",
+        "Versa sedan side view photo 2022",
+    ],
+    "Mitsubishi Mirage": [
+        "Mitsubishi Mirage 2017 hatchback exterior",
+        "Mirage A05 hatchback 2017 2018 street photo",
+        "Mitsubishi Mirage 2019 2020 real photo outdoor",
+        "Mirage hatchback side view photo",
+    ],
+
+    # ── Common midsize sedans ─────────────────────────────────────────────
+    "Nissan Altima 6th Gen": [
+        "Nissan Altima 2019 sixth gen exterior side view",
+        "Altima L34 sedan 2019 2020 street photo",
+        "Nissan Altima 2021 2022 real photo outdoor",
+        "Altima sedan side view photo 2022",
+    ],
+    "Hyundai Sonata DN8": [
+        "Hyundai Sonata DN8 2020 exterior side view",
+        "Sonata 2020 2021 8th gen sedan street photo",
+        "Hyundai Sonata 2021 2022 real photo outdoor",
+        "Sonata DN8 sedan side view photo",
+    ],
+    "Kia K5": [
+        "Kia K5 Optima 2021 exterior side view",
+        "K5 DL3 sedan 2021 2022 street photo",
+        "Kia K5 2021 2022 real photo outdoor",
+        "K5 sedan side view photo 2022",
+    ],
+    "Mazda 6 GJ": [
+        "Mazda 6 GJ 2018 sedan exterior side view",
+        "Mazda6 2018 2019 sedan street photo",
+        "Mazda 6 2020 2021 real photo outdoor",
+        "Mazda6 GJ sedan side view photo",
+    ],
+    "Volkswagen Passat B8": [
+        "Volkswagen Passat B8 2016 exterior side view",
+        "VW Passat 2016 2017 sedan street photo",
+        "Volkswagen Passat 2019 2020 real photo outdoor",
+        "Passat B8 sedan side view photo",
+    ],
+    "Subaru Legacy 7th Gen": [
+        "Subaru Legacy 2020 seventh gen exterior",
+        "Legacy BN BR sedan 2020 2021 street photo",
+        "Subaru Legacy 2021 2022 real photo outdoor",
+        "Legacy sedan side view photo 2022",
+    ],
+    "Chevrolet Malibu 9th Gen": [
+        "Chevrolet Malibu 2016 ninth gen exterior",
+        "Malibu sedan 2016 2017 street photo side",
+        "Chevrolet Malibu 2019 2020 real photo outdoor",
+        "Malibu sedan side view photo 2020",
+    ],
+    "Chrysler 300": [
+        "Chrysler 300 2011 sedan exterior side view",
+        "Chrysler 300 300S 2015 2016 street photo",
+        "Chrysler 300 2019 2020 real photo outdoor",
+        "300 sedan side view photo 2018",
+    ],
+
+    # ── Full-size sedans ──────────────────────────────────────────────────
+    "Toyota Avalon 5th Gen": [
+        "Toyota Avalon 2019 fifth gen exterior side view",
+        "Avalon XX50 sedan 2019 2020 street photo",
+        "Toyota Avalon 2021 2022 real photo outdoor",
+        "Avalon sedan side view photo 2021",
+    ],
+    "Chevrolet Impala 10th Gen": [
+        "Chevrolet Impala 2014 tenth gen exterior",
+        "Impala 2014 2015 sedan street photo side",
+        "Chevrolet Impala 2018 2019 real photo outdoor",
+        "Impala sedan side view photo 2019",
+    ],
+    "Ford Crown Victoria": [
+        "Ford Crown Victoria P71 exterior side view",
+        "Crown Victoria police interceptor street photo",
+        "Ford Crown Victoria 2008 2009 real photo outdoor",
+        "Crown Vic sedan side view photo",
+    ],
+
+    # ── Muscle/sport civilian ─────────────────────────────────────────────
+    "Ford Mustang S550": [
+        "Ford Mustang S550 2015 exterior side view",
+        "Mustang EcoBoost GT 2015 2016 street photo",
+        "Ford Mustang 2017 2018 2019 real photo outdoor",
+        "S550 Mustang fastback side view photo",
+    ],
+    "Chevrolet Camaro 6th Gen": [
+        "Chevrolet Camaro 2016 sixth gen exterior",
+        "Camaro SS LT1 2016 2017 street photo side",
+        "Chevrolet Camaro 2018 2019 real photo outdoor",
+        "Camaro coupe side view photo 2020",
+    ],
+
+    # ── Compact crossovers ────────────────────────────────────────────────
+    "Toyota RAV4 5th Gen": [
+        "Toyota RAV4 2019 fifth gen exterior side view",
+        "RAV4 XSE TRD 2019 2020 street photo",
+        "Toyota RAV4 2021 2022 real photo outdoor",
+        "RAV4 SUV side view photo 2022",
+    ],
+    "Honda CR-V 5th Gen": [
+        "Honda CR-V 2017 fifth gen exterior side view",
+        "CRV EX Touring 2017 2018 street photo",
+        "Honda CR-V 2019 2020 real photo outdoor",
+        "CR-V SUV side view photo 2021",
+    ],
+    "Ford Escape 4th Gen": [
+        "Ford Escape 2020 fourth gen exterior side view",
+        "Escape SE Titanium 2020 2021 street photo",
+        "Ford Escape 2021 2022 real photo outdoor",
+        "Escape SUV side view photo 2022",
+    ],
+    "Chevrolet Equinox 3rd Gen": [
+        "Chevrolet Equinox 2018 third gen exterior",
+        "Equinox LT Premier 2018 2019 street photo",
+        "Chevrolet Equinox 2020 2021 real photo outdoor",
+        "Equinox SUV side view photo 2022",
+    ],
+    "Nissan Rogue 3rd Gen": [
+        "Nissan Rogue 2021 third gen exterior side view",
+        "Rogue SV SL 2021 2022 street photo",
+        "Nissan Rogue 2022 2023 real photo outdoor",
+        "Rogue SUV side view photo 2022",
+    ],
+    "Hyundai Tucson NX4": [
+        "Hyundai Tucson 2022 NX4 exterior side view",
+        "Tucson 2022 2023 fourth gen street photo",
+        "Hyundai Tucson 2022 real photo outdoor",
+        "Tucson NX4 SUV side view photo",
+    ],
+    "Mazda CX-5 2nd Gen": [
+        "Mazda CX-5 2017 second gen exterior side view",
+        "CX-5 KF 2017 2018 street photo",
+        "Mazda CX-5 2019 2020 real photo outdoor",
+        "CX-5 SUV side view photo 2022",
+    ],
+    "Kia Sportage NQ5": [
+        "Kia Sportage 2022 NQ5 exterior side view",
+        "Sportage 2022 2023 fifth gen street photo",
+        "Kia Sportage 2022 real photo outdoor",
+        "Sportage NQ5 SUV side view photo",
+    ],
+    "Subaru Forester 5th Gen": [
+        "Subaru Forester 2019 fifth gen exterior",
+        "Forester SK 2019 2020 street photo side",
+        "Subaru Forester 2021 2022 real photo outdoor",
+        "Forester SUV side view photo 2022",
+    ],
+    "Jeep Cherokee KL": [
+        "Jeep Cherokee KL 2014 exterior side view",
+        "Cherokee Trailhawk Latitude 2016 2017 street photo",
+        "Jeep Cherokee 2019 2020 real photo outdoor",
+        "Cherokee KL SUV side view photo",
+    ],
+    "Volkswagen Tiguan 2nd Gen": [
+        "Volkswagen Tiguan 2018 second gen exterior",
+        "VW Tiguan SE R-Line 2018 2019 street photo",
+        "Volkswagen Tiguan 2020 2021 real photo outdoor",
+        "Tiguan SUV side view photo 2022",
+    ],
+    "Subaru Outback 6th Gen": [
+        "Subaru Outback 2020 sixth gen exterior",
+        "Outback BT 2020 2021 street photo side",
+        "Subaru Outback 2021 2022 real photo outdoor",
+        "Outback wagon SUV side view photo",
+    ],
+
+    # ── Midsize SUVs ──────────────────────────────────────────────────────
+    "Ford Explorer 6th Gen": [
+        "Ford Explorer 2020 sixth gen exterior side view",
+        "Explorer ST Platinum 2020 2021 street photo",
+        "Ford Explorer 2021 2022 real photo outdoor",
+        "Explorer SUV side view photo 2022",
+    ],
+    "Chevrolet Traverse 2nd Gen": [
+        "Chevrolet Traverse 2018 second gen exterior",
+        "Traverse LT Premier 2018 2019 street photo",
+        "Chevrolet Traverse 2020 2021 real photo outdoor",
+        "Traverse SUV side view photo 2022",
+    ],
+    "Toyota Highlander 4th Gen": [
+        "Toyota Highlander 2020 fourth gen exterior",
+        "Highlander XSE Platinum 2020 2021 street photo",
+        "Toyota Highlander 2021 2022 real photo outdoor",
+        "Highlander SUV side view photo 2022",
+    ],
+    "Honda Pilot 3rd Gen": [
+        "Honda Pilot 2016 third gen exterior side view",
+        "Pilot EX Touring 2016 2017 street photo",
+        "Honda Pilot 2019 2020 real photo outdoor",
+        "Pilot SUV side view photo 2021",
+    ],
+    "Nissan Pathfinder 5th Gen": [
+        "Nissan Pathfinder 2022 fifth gen exterior",
+        "Pathfinder SV Platinum 2022 2023 street photo",
+        "Nissan Pathfinder 2022 real photo outdoor",
+        "Pathfinder SUV side view photo 2022",
+    ],
+    "Hyundai Palisade": [
+        "Hyundai Palisade 2020 exterior side view",
+        "Palisade SEL Calligraphy 2020 2021 street photo",
+        "Hyundai Palisade 2021 2022 real photo outdoor",
+        "Palisade SUV side view photo 2022",
+    ],
+    "Kia Telluride": [
+        "Kia Telluride 2020 exterior side view",
+        "Telluride EX SX 2020 2021 street photo",
+        "Kia Telluride 2021 2022 real photo outdoor",
+        "Telluride SUV side view photo 2022",
+    ],
+    "GMC Acadia 2nd Gen": [
+        "GMC Acadia 2017 second gen exterior side view",
+        "Acadia SLE Denali 2017 2018 street photo",
+        "GMC Acadia 2019 2020 real photo outdoor",
+        "Acadia SUV side view photo 2021",
+    ],
+    "Dodge Durango WD": [
+        "Dodge Durango 2014 WD exterior side view",
+        "Durango GT SRT 2016 2017 street photo",
+        "Dodge Durango 2019 2020 real photo outdoor",
+        "Durango SUV side view photo 2021",
+    ],
+    "Volkswagen Atlas": [
+        "Volkswagen Atlas 2018 exterior side view",
+        "VW Atlas SE R-Line 2018 2019 street photo",
+        "Volkswagen Atlas 2020 2021 real photo outdoor",
+        "Atlas SUV side view photo 2022",
+    ],
+
+    # ── Full-size SUVs ────────────────────────────────────────────────────
+    "Chevrolet Suburban 12th Gen": [
+        "Chevrolet Suburban 2021 twelfth gen exterior",
+        "Suburban LT Premier 2021 2022 street photo",
+        "Chevrolet Suburban 2021 real photo outdoor",
+        "Suburban full-size SUV side view photo",
+    ],
+    "Chevrolet Tahoe 5th Gen": [
+        "Chevrolet Tahoe 2021 fifth gen exterior side view",
+        "Tahoe LT Z71 2021 2022 street photo",
+        "Chevrolet Tahoe 2021 real photo outdoor",
+        "Tahoe SUV side view photo 2022",
+    ],
+    "Ford Expedition 4th Gen": [
+        "Ford Expedition 2018 fourth gen exterior side view",
+        "Expedition XLT Limited 2018 2019 street photo",
+        "Ford Expedition 2020 2021 real photo outdoor",
+        "Expedition full-size SUV side view photo",
+    ],
+    "GMC Yukon 5th Gen": [
+        "GMC Yukon 2021 fifth gen exterior side view",
+        "Yukon SLT Denali 2021 2022 street photo",
+        "GMC Yukon 2021 real photo outdoor",
+        "Yukon full-size SUV side view photo",
+    ],
+
+    # ── Midsize trucks ────────────────────────────────────────────────────
+    "Chevrolet Colorado 2nd Gen": [
+        "Chevrolet Colorado 2015 second gen exterior",
+        "Colorado Z71 ZR2 2015 2016 street photo",
+        "Chevrolet Colorado 2019 2020 real photo outdoor",
+        "Colorado midsize truck side view photo",
+    ],
+    "Honda Ridgeline 2nd Gen": [
+        "Honda Ridgeline 2017 second gen exterior",
+        "Ridgeline RTL Black Edition 2017 2018 street photo",
+        "Honda Ridgeline 2019 2020 real photo outdoor",
+        "Ridgeline pickup truck side view photo",
+    ],
+    "Nissan Frontier 3rd Gen": [
+        "Nissan Frontier 2022 third gen exterior",
+        "Frontier SV Pro-4X 2022 2023 street photo",
+        "Nissan Frontier 2022 real photo outdoor",
+        "Frontier midsize truck side view photo",
+    ],
+    "GMC Canyon 2nd Gen": [
+        "GMC Canyon 2015 second gen exterior side view",
+        "Canyon SLE Denali 2015 2016 street photo",
+        "GMC Canyon 2019 2020 real photo outdoor",
+        "Canyon midsize truck side view photo",
+    ],
+
+    # ── Minivans ──────────────────────────────────────────────────────────
+    "Toyota Sienna 4th Gen": [
+        "Toyota Sienna 2021 fourth gen exterior side view",
+        "Sienna XSE Platinum 2021 2022 street photo",
+        "Toyota Sienna 2021 real photo outdoor",
+        "Sienna minivan side view photo 2022",
+    ],
+    "Chrysler Pacifica": [
+        "Chrysler Pacifica 2017 minivan exterior side view",
+        "Pacifica Touring Limited 2017 2018 street photo",
+        "Chrysler Pacifica 2019 2020 real photo outdoor",
+        "Pacifica minivan side view photo 2021",
+    ],
+    "Kia Carnival": [
+        "Kia Carnival 2022 minivan exterior side view",
+        "Carnival LX EX 2022 2023 street photo",
+        "Kia Carnival 2022 real photo outdoor",
+        "Carnival minivan side view photo",
+    ],
+
+    # ── Hybrid / EV common ────────────────────────────────────────────────
+    "Toyota Prius 4th Gen": [
+        "Toyota Prius 2016 fourth gen exterior side view",
+        "Prius XW50 2016 2017 street photo",
+        "Toyota Prius 2018 2019 real photo outdoor",
+        "Prius hatchback side view photo 2020",
+    ],
+    "Toyota Prius Prime": [
+        "Toyota Prius Prime 2017 PHEV exterior side view",
+        "Prius Prime plug-in hybrid 2017 2018 street photo",
+        "Toyota Prius Prime 2019 2020 real photo outdoor",
+        "Prius Prime hatchback side view photo",
+    ],
+    "Nissan LEAF 2nd Gen": [
+        "Nissan LEAF 2018 second gen exterior side view",
+        "LEAF Plus ZE1 EV 2018 2019 street photo",
+        "Nissan LEAF 2020 2021 real photo outdoor",
+        "LEAF electric hatchback side view photo",
+    ],
+    "Chevrolet Bolt EV": [
+        "Chevrolet Bolt EV 2017 exterior side view",
+        "Bolt EUV hatchback 2017 2018 street photo",
+        "Chevrolet Bolt 2020 2021 real photo outdoor",
+        "Bolt EV hatchback side view photo 2022",
+    ],
+    "Volkswagen ID.4": [
+        "Volkswagen ID.4 2021 exterior side view",
+        "VW ID4 Pro S AWD 2021 2022 street photo",
+        "Volkswagen ID.4 2022 real photo outdoor",
+        "ID.4 electric SUV side view photo",
+    ],
+    "Ford Mustang Mach-E": [
+        "Ford Mustang Mach-E 2021 exterior side view",
+        "Mach-E GT Premium 2021 2022 street photo",
+        "Ford Mustang Mach-E 2022 real photo outdoor",
+        "Mach-E electric SUV side view photo",
+    ],
+
+    # ── Entry-level luxury sedans ─────────────────────────────────────────
+    "Lexus ES 350 7th Gen": [
+        "Lexus ES 350 2019 seventh gen exterior side view",
+        "ES 350 F Sport 2019 2020 street photo",
+        "Lexus ES 2020 2021 real photo outdoor",
+        "ES350 luxury sedan side view photo 2022",
+    ],
+    "Cadillac CT5": [
+        "Cadillac CT5 2020 exterior side view",
+        "CT5 Premium Luxury Sport 2020 2021 street photo",
+        "Cadillac CT5 2021 2022 real photo outdoor",
+        "CT5 sedan side view photo 2022",
+    ],
+    "Acura TLX 2nd Gen": [
+        "Acura TLX 2021 second gen exterior side view",
+        "TLX A-Spec Type S 2021 2022 street photo",
+        "Acura TLX 2022 2023 real photo outdoor",
+        "TLX luxury sedan side view photo",
+    ],
+    "Infiniti Q50": [
+        "Infiniti Q50 2014 exterior side view",
+        "Q50 Sport Red Sport 2016 2017 street photo",
+        "Infiniti Q50 2019 2020 real photo outdoor",
+        "Q50 sedan side view photo 2021",
+    ],
+    "Volvo S60 3rd Gen": [
+        "Volvo S60 2019 third gen exterior side view",
+        "S60 T5 T6 Inscription 2019 2020 street photo",
+        "Volvo S60 2020 2021 real photo outdoor",
+        "S60 luxury sedan side view photo",
+    ],
+    "Genesis G70 2nd Gen": [
+        "Genesis G70 2022 second gen exterior side view",
+        "G70 2.0T 3.3T 2022 2023 street photo",
+        "Genesis G70 2022 real photo outdoor",
+        "G70 luxury sedan side view photo",
+    ],
+
+    # ── Entry-level luxury SUVs ───────────────────────────────────────────
+    "BMW X3 G01": [
+        "BMW X3 G01 2018 exterior side view",
+        "X3 xDrive30i M40i 2018 2019 street photo",
+        "BMW X3 2020 2021 real photo outdoor",
+        "X3 G01 luxury SUV side view photo",
+    ],
+    "Mercedes GLC W253": [
+        "Mercedes GLC 300 W253 2016 exterior side view",
+        "GLC 300 AMG Line 2016 2017 street photo",
+        "Mercedes GLC 2019 2020 real photo outdoor",
+        "GLC SUV side view photo 2021",
+    ],
+    "Audi Q5 2nd Gen": [
+        "Audi Q5 2018 second gen exterior side view",
+        "Q5 45 TFSI Premium Plus 2018 2019 street photo",
+        "Audi Q5 2020 2021 real photo outdoor",
+        "Q5 luxury SUV side view photo 2022",
+    ],
+    "Lexus RX 500h": [
+        "Lexus RX 2023 fifth gen exterior side view",
+        "RX 350 500h F Sport 2023 2024 street photo",
+        "Lexus RX 2022 2023 real photo outdoor",
+        "RX luxury SUV side view photo 2023",
+    ],
+    "Cadillac XT5": [
+        "Cadillac XT5 2017 exterior side view",
+        "XT5 Premium Luxury Sport 2017 2018 street photo",
+        "Cadillac XT5 2019 2020 real photo outdoor",
+        "XT5 luxury SUV side view photo 2021",
+    ],
+    "Acura MDX 4th Gen": [
+        "Acura MDX 2022 fourth gen exterior side view",
+        "MDX A-Spec Type S 2022 2023 street photo",
+        "Acura MDX 2022 real photo outdoor",
+        "MDX luxury SUV side view photo",
+    ],
+    "Infiniti QX60 3rd Gen": [
+        "Infiniti QX60 2022 third gen exterior side view",
+        "QX60 Luxe Autograph 2022 2023 street photo",
+        "Infiniti QX60 2022 real photo outdoor",
+        "QX60 luxury SUV side view photo",
+    ],
+    "Volvo XC60 2nd Gen": [
+        "Volvo XC60 2018 second gen exterior side view",
+        "XC60 T5 T6 Inscription 2018 2019 street photo",
+        "Volvo XC60 2020 2021 real photo outdoor",
+        "XC60 luxury SUV side view photo 2022",
+    ],
+    "Genesis GV70": [
+        "Genesis GV70 2022 exterior side view",
+        "GV70 2.5T 3.5T Sport 2022 2023 street photo",
+        "Genesis GV70 2022 real photo outdoor",
+        "GV70 luxury SUV side view photo",
+    ],
+    "Lincoln Corsair": [
+        "Lincoln Corsair 2020 exterior side view",
+        "Corsair Reserve Grand Touring 2020 2021 street photo",
+        "Lincoln Corsair 2021 2022 real photo outdoor",
+        "Corsair luxury SUV side view photo",
+    ],
+
+    # ── Public service / working fleet ────────────────────────────────────
+    "School Bus": [
+        "American yellow school bus exterior side view",
+        "school bus road street photo real",
+        "yellow school bus 2010 2015 outdoor photo",
+        "school bus front side view street",
+    ],
+    "City Transit Bus": [
+        "city transit bus exterior side view street",
+        "public transit bus road photo real",
+        "city bus MTA route outdoor photo",
+        "transit bus side view street photo",
+    ],
+    "Garbage Truck": [
+        "garbage truck rear loader exterior side view",
+        "refuse collection truck street photo real",
+        "garbage truck road outdoor photo",
+        "rear loader waste truck side view",
+    ],
+    "Recycling Truck": [
+        "recycling truck exterior side view street",
+        "recycling collection vehicle road photo",
+        "recycling truck outdoor photo real",
+        "blue green recycling truck side view",
+    ],
+    "Police Explorer": [
+        "Ford Explorer police interceptor exterior side view",
+        "police SUV Ford Explorer patrol car street photo",
+        "police Explorer PPV outdoor photo real",
+        "Ford Explorer police car side view",
+    ],
+    "Police Charger": [
+        "Dodge Charger police car exterior side view",
+        "police cruiser Dodge Charger patrol street photo",
+        "police Charger pursuit car outdoor photo real",
+        "Dodge Charger police interceptor side view",
+    ],
+    "Police Tahoe": [
+        "Chevrolet Tahoe police PPV exterior side view",
+        "police Tahoe patrol SUV street photo real",
+        "Chevy Tahoe police outdoor photo",
+        "Tahoe PPV police vehicle side view",
+    ],
+    "Fire Engine": [
+        "fire engine pumper truck exterior side view",
+        "red fire truck street photo real",
+        "fire department pumper engine outdoor photo",
+        "fire engine side view road photo",
+    ],
+    "Ladder Truck": [
+        "aerial ladder fire truck exterior side view",
+        "fire department ladder truck street photo real",
+        "ladder truck tiller outdoor photo",
+        "aerial ladder fire apparatus side view",
+    ],
+    "Ambulance": [
+        "box ambulance exterior side view",
+        "ambulance EMS street photo real",
+        "ambulance emergency vehicle outdoor photo",
+        "ambulance side view road photo",
+    ],
+    "USPS Mail Truck": [
+        "USPS mail truck LLV exterior side view",
+        "postal mail truck grumman LLV street photo",
+        "USPS delivery truck outdoor photo real",
+        "mail truck LLV side view road photo",
+    ],
+    "UPS Delivery Truck": [
+        "UPS delivery truck exterior side view",
+        "UPS brown package car street photo real",
+        "UPS truck outdoor photo delivery",
+        "UPS delivery vehicle side view road",
+    ],
+    "FedEx Truck": [
+        "FedEx delivery truck exterior side view",
+        "FedEx ground express truck street photo real",
+        "FedEx delivery vehicle outdoor photo",
+        "FedEx truck side view road photo",
+    ],
+    "Amazon Delivery Van": [
+        "Amazon delivery van exterior side view",
+        "Amazon blue delivery van street photo real",
+        "Amazon logistics van outdoor photo",
+        "Amazon prime van side view road photo",
+    ],
+    "Tow Truck": [
+        "flatbed tow truck exterior side view",
+        "tow truck rollback street photo real",
+        "flatbed wrecker outdoor photo",
+        "tow truck side view road photo",
+    ],
+    "Street Sweeper": [
+        "street sweeper vehicle exterior side view",
+        "road sweeper truck street photo real",
+        "street cleaning vehicle outdoor photo",
+        "street sweeper side view road photo",
+    ],
 }
 
 
@@ -492,7 +1144,22 @@ def download_image(url: str):
 
 
 def scrape_class(ddgs, gen_class: str, target: int, seen_hashes: set) -> int:
-    queries  = CLASS_QUERIES.get(gen_class, [f"{gen_class} car exterior photo"])
+    base_queries = list(CLASS_QUERIES.get(gen_class, [f"{gen_class} car exterior photo"]))
+    # Rear-view queries are prepended so that classes already at the old target
+    # (150) fill their next 20 slots with rear imagery first.  Skipped for
+    # _Background and service vehicles where the front is the canonical view.
+    _rear_skip = {"_Background", "School Bus", "City Transit Bus", "Garbage Truck",
+                  "Recycling Truck", "Fire Engine", "Ladder Truck", "Ambulance",
+                  "USPS Mail Truck", "UPS Delivery Truck", "FedEx Truck",
+                  "Amazon Delivery Van", "Tow Truck", "Street Sweeper"}
+    if gen_class not in _rear_skip:
+        rear_queries = [
+            f"{gen_class} rear view taillight photo",
+            f"{gen_class} back bumper exterior street photo",
+        ]
+        queries = rear_queries + base_queries
+    else:
+        queries = base_queries
     dest_dir = class_to_dir(gen_class)
     existing = len(list(dest_dir.glob("*.jpg"))) if dest_dir.exists() else 0
     saved    = existing
@@ -516,7 +1183,7 @@ def scrape_class(ddgs, gen_class: str, target: int, seen_hashes: set) -> int:
             ))
         except Exception as exc:
             log.warning("  DDG search failed for %r: %s", query, exc)
-            time.sleep(3)
+            time.sleep(15)
             continue
 
         for result in results:
@@ -543,7 +1210,7 @@ def scrape_class(ddgs, gen_class: str, target: int, seen_hashes: set) -> int:
             saved += 1
             log.info("  [%d/%d] saved %s", saved, target, dest.name)
 
-        time.sleep(1.5)  # polite pause between queries
+        time.sleep(8)  # polite pause between queries — DDG rate-limits hard below ~8s
 
     return saved
 

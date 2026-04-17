@@ -121,6 +121,53 @@ async def me_info(authorization: str = Header(...)):
     }
 
 
+class UpsertProfileRequest(BaseModel):
+    username: str
+
+
+@router.post("/profile")
+@_limiter.limit("10/minute")
+async def upsert_profile(request: Request, body: UpsertProfileRequest, authorization: str = Header(...)):
+    """
+    Create or update the player row for an OAuth-authenticated user.
+    Called after Apple/Google sign-in when /me returns 404 (new user).
+    """
+    db = get_client()
+    token = authorization.replace("Bearer ", "")
+    try:
+        auth_result = db.auth.get_user(token)
+        if not auth_result or not auth_result.user:
+            raise ValueError()
+        user_id = auth_result.user.id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        db.table("players").upsert({
+            "id":       user_id,
+            "username": body.username,
+            "credits":  100,
+        }, on_conflict="id").execute()
+    except Exception as e:
+        if "username" in str(e).lower():
+            raise HTTPException(status_code=409, detail="Username already taken")
+        raise HTTPException(status_code=500, detail="Could not create player profile")
+
+    result = db.table("players") \
+        .select("username, xp, level, credits, crew_id, is_subscriber") \
+        .eq("id", user_id).single().execute()
+    d = result.data
+    return {
+        "user_id":  user_id,
+        "username": d["username"],
+        "xp":       d["xp"],
+        "level":    d["level"],
+        "credits":  d.get("credits", 0),
+        "crew_id":  d.get("crew_id"),
+        "is_subscriber": d.get("is_subscriber", False),
+    }
+
+
 class PushTokenRequest(BaseModel):
     expo_push_token: str
 

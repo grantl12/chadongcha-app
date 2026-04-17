@@ -6,10 +6,16 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { Camera } from 'react-native-vision-camera';
 import * as Notifications from 'expo-notifications';
 import { usePlayerStore } from '@/stores/playerStore';
 import { apiClient } from '@/api/client';
+import { supabase } from '@/lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
 
 async function saveHomeLocation(): Promise<void> {
   try {
@@ -26,7 +32,7 @@ async function saveHomeLocation(): Promise<void> {
   }
 }
 
-type Step = 'splash' | 'auth' | 'permissions';
+type Step = 'splash' | 'auth' | 'username' | 'permissions';
 type AuthMode = 'signin' | 'signup';
 
 // ─── Splash ──────────────────────────────────────────────────────────────────
@@ -72,17 +78,95 @@ function SplashStep({ onNext }: { onNext: () => void }) {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-function AuthStep({ onSuccess }: { onSuccess: () => void }) {
-  const { setPlayer, setProfile } = usePlayerStore();
+function AuthStep({ onSuccess, onNeedsUsername }: {
+  onSuccess: () => void;
+  onNeedsUsername: (token: string, userId: string) => void;
+}) {
+  const { setPlayer, setProfile, setFullProfile } = usePlayerStore();
   const [mode, setMode]         = useState<AuthMode>('signup');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading]   = useState(false);
+  const [ssoLoading, setSsoLoading] = useState<'apple' | 'google' | null>(null);
   const [error, setError]       = useState<string | null>(null);
   const [info, setInfo]         = useState<string | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
 
-  async function handleSubmit() {
+  // After SSO: if the player already has a profile, go to permissions;
+  // if not (new user), go to the username picker.
+  async function finishOAuthSession(accessToken: string, userId: string) {
+    try {
+      const profile = await apiClient.get('/auth/me') as {
+        username: string; xp: number; level: number; credits: number;
+        crew_id: string | null; is_subscriber: boolean;
+      };
+      setPlayer({ userId, username: profile.username, accessToken });
+      setFullProfile({
+        xp: profile.xp, level: profile.level, credits: profile.credits,
+        crewId: profile.crew_id, isSubscriber: profile.is_subscriber,
+      });
+      onSuccess();
+    } catch {
+      // 404 → new OAuth user, needs a username
+      setPlayer({ userId, username: '', accessToken });
+      onNeedsUsername(accessToken, userId);
+    }
+  }
+
+  async function handleAppleSignIn() {
+    setSsoLoading('apple');
+    setError(null);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const { data, error: sbError } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token:    credential.identityToken!,
+      });
+      if (sbError || !data.session) throw sbError ?? new Error('No session');
+      await finishOAuthSession(data.session.access_token, data.session.user.id);
+    } catch (e: unknown) {
+      const code = (e as any)?.code;
+      if (code === 'ERR_REQUEST_CANCELED') { setSsoLoading(null); return; }
+      setError('Apple sign in failed. Try again.');
+    } finally {
+      setSsoLoading(null);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setSsoLoading('google');
+    setError(null);
+    try {
+      const redirectUri = makeRedirectUri({ scheme: 'chadongcha', path: 'auth/callback' });
+      const { data, error: sbError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options:  { redirectTo: redirectUri, skipBrowserRedirect: true },
+      });
+      if (sbError || !data.url) throw sbError ?? new Error('No OAuth URL');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+      if (result.type !== 'success') { setSsoLoading(null); return; }
+
+      // PKCE flow — redirect carries ?code=xxx
+      const code = result.url.split('?')[1]?.split('&').find(p => p.startsWith('code='))?.split('=')[1];
+      if (!code) throw new Error('No auth code in redirect');
+      const { data: sessionData, error: sessionErr } = await supabase.auth.exchangeCodeForSession(code);
+      if (sessionErr || !sessionData.session) throw sessionErr ?? new Error('No session');
+      await finishOAuthSession(sessionData.session.access_token, sessionData.session.user.id);
+    } catch (e: unknown) {
+      setError('Google sign in failed. Try again.');
+    } finally {
+      setSsoLoading(null);
+    }
+  }
+
+  async function handleEmailSubmit() {
     if (!email || !password) { setError('Email and password are required.'); return; }
     setLoading(true);
     setError(null);
@@ -91,49 +175,175 @@ function AuthStep({ onSuccess }: { onSuccess: () => void }) {
     try {
       if (mode === 'signup') {
         if (!username) { setError('Username is required.'); setLoading(false); return; }
-        const signupRes = await apiClient.post('/auth/signup', { email, password, username }) as {
-          user_id: string;
-          access_token?: string;
-          refresh_token?: string;
+        const res = await apiClient.post('/auth/signup', { email, password, username }) as {
+          user_id: string; access_token?: string;
         };
-
-        if (signupRes.access_token) {
-          // Backend issued a session directly — auto sign-in, no email step.
-          setPlayer({ userId: signupRes.user_id, username, accessToken: signupRes.access_token });
-          try {
-            const profile = await apiClient.get('/auth/me') as { username: string; xp: number; level: number };
-            setPlayer({ userId: signupRes.user_id, username: profile.username, accessToken: signupRes.access_token });
-            setProfile(profile.xp, profile.level);
-          } catch { /* non-fatal — username already set from form */ }
+        if (res.access_token) {
+          setPlayer({ userId: res.user_id, username, accessToken: res.access_token });
           onSuccess();
           return;
         }
-
-        // Fallback (shouldn't normally hit): manual sign-in
         setInfo('Account created! Sign in to continue.');
         setMode('signin');
         setLoading(false);
         return;
       }
 
-      const signinRes = await apiClient.post('/auth/signin', { email, password }) as {
-        access_token: string;
-        user_id: string;
+      const res = await apiClient.post('/auth/signin', { email, password }) as {
+        access_token: string; user_id: string;
       };
-
-      setPlayer({ userId: signinRes.user_id, username: email, accessToken: signinRes.access_token });
-
+      setPlayer({ userId: res.user_id, username: email.split('@')[0], accessToken: res.access_token });
       try {
         const profile = await apiClient.get('/auth/me') as { username: string; xp: number; level: number };
-        setPlayer({ userId: signinRes.user_id, username: profile.username, accessToken: signinRes.access_token });
+        setPlayer({ userId: res.user_id, username: profile.username, accessToken: res.access_token });
         setProfile(profile.xp, profile.level);
-      } catch {
-        setPlayer({ userId: signinRes.user_id, username: email.split('@')[0], accessToken: signinRes.access_token });
-      }
-
+      } catch { /* non-fatal */ }
       onSuccess();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Something went wrong';
+      const msg   = e instanceof Error ? e.message : 'Something went wrong';
+      const match = msg.match(/→ \d+: (.*)/);
+      setError(match ? match[1] : msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const anyLoading = loading || !!ssoLoading;
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.authContainer} keyboardShouldPersistTaps="handled">
+        <Text style={styles.authTitle}>Join the Touge</Text>
+        <Text style={styles.authSub}>Sign in to start catching.</Text>
+
+        <View style={styles.ssoButtons}>
+          {/* Apple Sign In — iOS only, required by App Store guidelines */}
+          {Platform.OS === 'ios' && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={8}
+              style={styles.appleBtn}
+              onPress={handleAppleSignIn}
+            />
+          )}
+
+          {/* Google Sign In */}
+          <Pressable
+            style={[styles.googleBtn, anyLoading && styles.buttonDisabled]}
+            onPress={handleGoogleSignIn}
+            disabled={anyLoading}
+          >
+            {ssoLoading === 'google'
+              ? <ActivityIndicator color="#111" />
+              : <>
+                  <Text style={styles.googleIcon}>G</Text>
+                  <Text style={styles.googleText}>Continue with Google</Text>
+                </>
+            }
+          </Pressable>
+        </View>
+
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        {/* Email fallback — collapsible */}
+        <Pressable style={styles.emailToggle} onPress={() => setShowEmail(v => !v)}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>{showEmail ? 'hide email' : 'or use email'}</Text>
+          <View style={styles.dividerLine} />
+        </Pressable>
+
+        {showEmail && (
+          <View style={styles.form}>
+            {mode === 'signup' && (
+              <TextInput
+                style={styles.input}
+                placeholder="Username"
+                placeholderTextColor="#444"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            )}
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#444"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#444"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            {info && <Text style={styles.infoText}>{info}</Text>}
+
+            <Pressable
+              style={[styles.primaryButton, anyLoading && styles.buttonDisabled]}
+              onPress={handleEmailSubmit}
+              disabled={anyLoading}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.buttonText}>
+                    {mode === 'signup' ? 'CREATE ACCOUNT' : 'SIGN IN'}
+                  </Text>
+              }
+            </Pressable>
+
+            <Pressable
+              onPress={() => { setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(null); setInfo(null); }}
+              style={styles.secondaryLink}
+            >
+              <Text style={styles.secondaryLinkText}>
+                {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+// ─── Username picker (new OAuth users) ────────────────────────────────────────
+
+function UsernameStep({ token, userId, onSuccess }: {
+  token: string;
+  userId: string;
+  onSuccess: () => void;
+}) {
+  const { setPlayer, setFullProfile } = usePlayerStore();
+  const [username, setUsername] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+
+  async function handleSubmit() {
+    if (username.trim().length < 3) { setError('Username must be at least 3 characters.'); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const profile = await apiClient.post('/auth/profile', { username: username.trim() }) as {
+        user_id: string; username: string; xp: number; level: number;
+        credits: number; crew_id: string | null; is_subscriber: boolean;
+      };
+      setPlayer({ userId, username: profile.username, accessToken: token });
+      setFullProfile({
+        xp: profile.xp, level: profile.level, credits: profile.credits,
+        crewId: profile.crew_id, isSubscriber: profile.is_subscriber,
+      });
+      onSuccess();
+    } catch (e: unknown) {
+      const msg   = e instanceof Error ? e.message : 'Something went wrong';
       const match = msg.match(/→ \d+: (.*)/);
       setError(match ? match[1] : msg);
     } finally {
@@ -142,51 +352,24 @@ function AuthStep({ onSuccess }: { onSuccess: () => void }) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.authContainer} keyboardShouldPersistTaps="handled">
-        <Text style={styles.authTitle}>
-          {mode === 'signup' ? 'Create Account' : 'Welcome Back'}
-        </Text>
-        <Text style={styles.authSub}>
-          {mode === 'signup' ? 'Start your collection.' : 'Sign in to continue.'}
-        </Text>
+        <Text style={styles.authTitle}>Pick a Handle</Text>
+        <Text style={styles.authSub}>This is how other players will see you on the leaderboard.</Text>
 
         <View style={styles.form}>
-          {mode === 'signup' && (
-            <TextInput
-              style={styles.input}
-              placeholder="Username"
-              placeholderTextColor="#444"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          )}
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder="Username (3–20 chars)"
             placeholderTextColor="#444"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            value={username}
+            onChangeText={setUsername}
             autoCapitalize="none"
             autoCorrect={false}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#444"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
+            maxLength={20}
           />
 
           {error && <Text style={styles.error}>{error}</Text>}
-          {info  && <Text style={styles.infoText}>{info}</Text>}
 
           <Pressable
             style={[styles.primaryButton, loading && styles.buttonDisabled]}
@@ -195,19 +378,8 @@ function AuthStep({ onSuccess }: { onSuccess: () => void }) {
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.buttonText}>
-                  {mode === 'signup' ? 'CREATE ACCOUNT' : 'SIGN IN'}
-                </Text>
+              : <Text style={styles.buttonText}>SET USERNAME</Text>
             }
-          </Pressable>
-
-          <Pressable
-            onPress={() => { setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(null); setInfo(null); }}
-            style={styles.secondaryLink}
-          >
-            <Text style={styles.secondaryLinkText}>
-              {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -361,6 +533,8 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
 
 export default function Onboarding() {
   const [step, setStep] = useState<Step>('splash');
+  const [oauthToken, setOauthToken]   = useState('');
+  const [oauthUserId, setOauthUserId] = useState('');
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   function transition(to: Step) {
@@ -368,20 +542,37 @@ export default function Onboarding() {
       Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
       Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
     ]).start();
-    // Step updates immediately — fade gives visual separation
     setStep(to);
   }
 
-  function finish() {
-    router.replace('/(tabs)');
+  function handleNeedsUsername(token: string, userId: string) {
+    setOauthToken(token);
+    setOauthUserId(userId);
+    transition('username');
   }
 
   return (
     <View style={styles.root}>
       <Animated.View style={[{ flex: 1 }, { opacity: fadeAnim }]}>
-        {step === 'splash'      && <SplashStep onNext={() => transition('auth')} />}
-        {step === 'auth'        && <AuthStep onSuccess={() => transition('permissions')} />}
-        {step === 'permissions' && <PermissionsStep onDone={finish} />}
+        {step === 'splash' && (
+          <SplashStep onNext={() => transition('auth')} />
+        )}
+        {step === 'auth' && (
+          <AuthStep
+            onSuccess={() => transition('permissions')}
+            onNeedsUsername={handleNeedsUsername}
+          />
+        )}
+        {step === 'username' && (
+          <UsernameStep
+            token={oauthToken}
+            userId={oauthUserId}
+            onSuccess={() => transition('permissions')}
+          />
+        )}
+        {step === 'permissions' && (
+          <PermissionsStep onDone={() => router.replace('/(tabs)')} />
+        )}
       </Animated.View>
     </View>
   );
@@ -408,9 +599,21 @@ const styles = StyleSheet.create({
   authContainer:      { flexGrow: 1, padding: 32, paddingTop: 100, justifyContent: 'flex-start' },
   authTitle:          { color: '#fff', fontSize: 32, fontWeight: '900', marginBottom: 6 },
   authSub:            { color: '#555', fontSize: 14, marginBottom: 40 },
+
+  ssoButtons:         { gap: 12, marginBottom: 8 },
+  appleBtn:           { width: '100%', height: 50 },
+  googleBtn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+                        backgroundColor: '#fff', borderRadius: 8, height: 50 },
+  googleIcon:         { color: '#e63946', fontSize: 18, fontWeight: '900' },
+  googleText:         { color: '#111', fontSize: 15, fontWeight: '700' },
+
+  emailToggle:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 20 },
+  dividerLine:        { flex: 1, height: 1, backgroundColor: '#1a1a1a' },
+  dividerText:        { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+
   form:               { gap: 12 },
   input:              { backgroundColor: '#141414', color: '#fff', borderRadius: 8, padding: 14, fontSize: 15, borderWidth: 1, borderColor: '#222' },
-  error:              { color: '#e63946', fontSize: 13, textAlign: 'center' },
+  error:              { color: '#e63946', fontSize: 13, textAlign: 'center', marginBottom: 4 },
   infoText:           { color: '#4ade80', fontSize: 13, textAlign: 'center' },
 
   // Permissions

@@ -24,6 +24,7 @@ module.exports = {
     supportsTablet: false,
     bundleIdentifier: "com.chadongcha.app",
     appleTeamId: "9R34NWWUHD",
+    usesAppleSignIn: true,
     infoPlist: {
       NSCameraUsageDescription:
         "Chadongcha uses your camera to identify and catch vehicles.",
@@ -54,6 +55,7 @@ module.exports = {
   plugins: [
     "expo-router",
     "expo-notifications",
+    "expo-apple-authentication",
     "./plugins/withVehicleClassifier",
     [
       "react-native-vision-camera",
@@ -84,5 +86,8 @@ module.exports = {
     mapboxPublicToken: process.env.MAPBOX_PUBLIC_TOKEN ?? "",
     // Public base URL for Cloudflare R2 (community photos, 3D assets)
     r2PublicUrl: process.env.R2_PUBLIC_URL ?? "",
+    // Supabase — public (anon) credentials, safe to ship in the binary
+    supabaseUrl:     process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
+    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
   },
 };

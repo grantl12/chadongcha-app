@@ -43,8 +43,11 @@ export default function PlayerCardScreen() {
 
   async function handleShare() {
     if (!data) return;
+    const url = `https://chadongcha.app/player/${data.player_id}`;
     await Share.share({
-      message: `Check out ${data.username} on ChaDongCha — Level ${data.level}, ${data.total_catches} catches, ${data.road_king_count} road king territories.`,
+      title:   `${data.username} on ChaDongCha`,
+      message: `Check out ${data.username} on ChaDongCha — Level ${data.level}, ${data.total_catches} catches, ${data.road_king_count} road king territories.\n${url}`,
+      url,
     });
   }
 
@@ -142,8 +145,8 @@ const styles = StyleSheet.create({
   backBtn:         { width: 44, height: 36, alignItems: 'flex-start', justifyContent: 'center' },
   backText:        { color: '#555', fontSize: 22 },
   title:           { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 4 },
-  shareBtn:        { width: 60, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 10 }, // Increased width and added paddingRight
-  shareText:       { color: '#e63946', fontSize: 12, fontWeight: '800', letterSpacing: 1 }, // Increased fontSize slightly
+  shareBtn:        { minWidth: 60, alignItems: 'flex-end', justifyContent: 'center' },
+  shareText:       { color: '#e63946', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
 
   center:          { flex: 1, alignItems: 'center', justifyContent: 'center' },
   hint:            { color: '#444', fontSize: 14 },

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, FlatList,
+  View, Text, StyleSheet, Pressable, FlatList, Alert,
   ActivityIndicator, ScrollView, RefreshControl
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +13,7 @@ import { PaywallModal } from '@/components/PaywallModal';
 export default function CrewScreen() {
   const queryClient  = useQueryClient();
   const crewId       = usePlayerStore(s => s.crewId);
+  const userId       = usePlayerStore(s => s.userId);
   const isSubscriber = usePlayerStore(s => s.isSubscriber);
   const [refreshing, setRefreshing] = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
@@ -34,9 +35,25 @@ export default function CrewScreen() {
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['crew'] });
-      // Note: In a real app, you'd update the player profile in the store here
-      // setFullProfile({ ...profile, crewId: id });
-    }
+    },
+  });
+
+  const leaveMutation = useMutation({
+    mutationFn: () => crewApi.leave(),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      queryClient.invalidateQueries({ queryKey: ['crew'] });
+      queryClient.invalidateQueries({ queryKey: ['crews-list'] });
+    },
+  });
+
+  const disbandMutation = useMutation({
+    mutationFn: () => crewApi.disband(crewId!),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      queryClient.invalidateQueries({ queryKey: ['crew'] });
+      queryClient.invalidateQueries({ queryKey: ['crews-list'] });
+    },
   });
 
   const onRefresh = useCallback(async () => {
@@ -150,14 +167,35 @@ export default function CrewScreen() {
           </View>
         ))}
 
-        <Pressable 
-          style={styles.leaveBtn}
+        <Pressable
+          style={[styles.leaveBtn, crew?.leader_id === userId && styles.disbandBtn]}
+          disabled={leaveMutation.isPending || disbandMutation.isPending}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            // leaveMutation.mutate();
+            if (crew?.leader_id === userId) {
+              Alert.alert(
+                'Disband Crew',
+                `This will permanently delete ${crew?.name} and remove all members. Are you sure?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Disband', style: 'destructive', onPress: () => disbandMutation.mutate() },
+                ],
+              );
+            } else {
+              Alert.alert(
+                'Leave Crew',
+                `Leave ${crew?.name}?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Leave', style: 'destructive', onPress: () => leaveMutation.mutate() },
+                ],
+              );
+            }
           }}
         >
-          <Text style={styles.leaveBtnText}>LEAVE TEAM</Text>
+          <Text style={[styles.leaveBtnText, crew?.leader_id === userId && styles.disbandBtnText]}>
+            {crew?.leader_id === userId ? 'DISBAND CREW' : 'LEAVE TEAM'}
+          </Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -204,4 +242,6 @@ const styles = StyleSheet.create({
 
   leaveBtn:       { marginTop: 60, paddingVertical: 16, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#141414' },
   leaveBtnText:   { color: '#333', fontSize: 12, fontWeight: '900', letterSpacing: 2 },
+  disbandBtn:     { borderColor: '#e63946', borderWidth: 1, borderRadius: 4 },
+  disbandBtnText: { color: '#e63946' },
 });

@@ -111,14 +111,26 @@ async def leave_crew(authorization: str = Header(...)):
         raise HTTPException(status_code=400, detail="You are not in a crew.")
 
     crew_id = player.data["crew_id"]
-    
-    # If leader leaves, what happens? For now, the crew stays but leader_id might become null or we transfer it.
-    # Simple approach: set crew_id to null for the player.
-    db.table("players").update({"crew_id": None}).eq("id", player_id).execute()
-    
-    # Optional: If crew has 0 members, delete it?
-    members = db.table("players").select("id", count="exact").eq("crew_id", crew_id).execute()  # type: ignore[arg-type]
-    if members.count == 0:
-        db.table("crews").delete().eq("id", crew_id).execute()
 
+    crew = db.table("crews").select("leader_id").eq("id", crew_id).maybe_single().execute()
+    if crew and crew.data and crew.data.get("leader_id") == player_id:
+        raise HTTPException(status_code=400, detail="Leaders must disband the crew before leaving.")
+
+    db.table("players").update({"crew_id": None}).eq("id", player_id).execute()
+    return {"ok": True}
+
+
+@router.delete("/{crew_id}")
+async def disband_crew(crew_id: str, authorization: str = Header(...)):
+    db = get_client()
+    player_id = _resolve_player(db, authorization)
+
+    crew = db.table("crews").select("leader_id").eq("id", crew_id).maybe_single().execute()
+    if not crew or not crew.data:
+        raise HTTPException(status_code=404, detail="Crew not found")
+    if crew.data["leader_id"] != player_id:
+        raise HTTPException(status_code=403, detail="Only the crew leader can disband.")
+
+    db.table("players").update({"crew_id": None}).eq("crew_id", crew_id).execute()
+    db.table("crews").delete().eq("id", crew_id).execute()
     return {"ok": True}

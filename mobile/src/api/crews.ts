@@ -31,6 +31,9 @@ export const crewApi = {
   join: (id: string) => 
     apiClient.post(`/crews/${id}/join`, {}) as Promise<{ ok: boolean }>,
   
-  leave: () => 
+  leave: () =>
     apiClient.post('/crews/leave', {}) as Promise<{ ok: boolean }>,
+
+  disband: (id: string) =>
+    apiClient.delete(`/crews/${id}`) as Promise<{ ok: boolean }>,
 };

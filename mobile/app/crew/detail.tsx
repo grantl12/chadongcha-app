@@ -25,17 +25,28 @@ export default function CrewDetailScreen() {
     mutationFn: () => crewApi.leave(),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      queryClient.invalidateQueries({ queryKey: ['crew'] }); // Invalidate current crew data
-      queryClient.setQueryData(['crew'], null); // Clear crew data from cache
-      queryClient.invalidateQueries({ queryKey: ['crews-list'] }); // Refresh list of crews
-      // Update player store if it holds crewId
-      // playerStore.setCrewId(null); 
-      router.replace('/crew'); // Navigate back to the crew hub/list
+      queryClient.invalidateQueries({ queryKey: ['crew'] });
+      queryClient.invalidateQueries({ queryKey: ['crews-list'] });
+      router.replace('/crew');
     },
     onError: (error: Error) => {
       console.error("Failed to leave crew:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    }
+    },
+  });
+
+  const disbandMutation = useMutation({
+    mutationFn: () => crewApi.disband(id!),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      queryClient.invalidateQueries({ queryKey: ['crew'] });
+      queryClient.invalidateQueries({ queryKey: ['crews-list'] });
+      router.replace('/crew');
+    },
+    onError: (error: Error) => {
+      console.error("Failed to disband crew:", error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    },
   });
 
   const onRefresh = useCallback(async () => {
@@ -91,25 +102,34 @@ export default function CrewDetailScreen() {
           </View>
         ))}
 
-        <Pressable 
+        <Pressable
           style={[styles.leaveBtn, isLeader && styles.leaderLeaveBtn]}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             if (isLeader) {
-              // TODO: Handle leader leaving scenario (e.g., prompt for new leader or disband)
-              Alert.alert("Cannot Leave", "As leader, you must disband the crew or appoint a new leader first.", [{ text: "OK" }]);
+              Alert.alert(
+                'Disband Crew',
+                `This will permanently delete ${crew.name} and remove all members. Are you sure?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Disband', style: 'destructive', onPress: () => disbandMutation.mutate() },
+                ],
+              );
             } else {
-              // Prompt user before leaving
-              Alert.alert("Leave Crew", `Are you sure you want to leave ${crew.name}?`, [
-                { text: "Cancel", style: "cancel" },
-                { text: "Leave", onPress: () => leaveMutation.mutate(), style: "destructive" }
-              ]);
+              Alert.alert(
+                'Leave Crew',
+                `Are you sure you want to leave ${crew.name}?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Leave', style: 'destructive', onPress: () => leaveMutation.mutate() },
+                ],
+              );
             }
           }}
-          disabled={leaveMutation.isPending}
+          disabled={leaveMutation.isPending || disbandMutation.isPending}
         >
           <Text style={[styles.leaveBtnText, isLeader && styles.leaderLeaveBtnText]}>
-            {isLeader ? "DISBAND CREW" : "LEAVE CREW"}
+            {isLeader ? 'DISBAND CREW' : 'LEAVE CREW'}
           </Text>
         </Pressable>
       </ScrollView>

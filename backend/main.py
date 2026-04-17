@@ -11,7 +11,7 @@ app = FastAPI(title="Chadongcha API", version="0.1.0")
 
 # Rate limiting (in-memory; no Redis required)
 app.state.limiter = auth._limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(

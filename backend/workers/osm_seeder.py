@@ -138,4 +138,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     bbox_parts = [float(x) for x in args.bbox.split(",")]
-    seed_area(args.city, args.country, tuple(bbox_parts))
+    seed_area(args.city, args.country, (bbox_parts[0], bbox_parts[1], bbox_parts[2], bbox_parts[3]))

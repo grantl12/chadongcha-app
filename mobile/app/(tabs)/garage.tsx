@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable, ScrollView,
-  ActivityIndicator, Modal, TextInput, Alert, Animated,
+  ActivityIndicator, Modal, TextInput, Alert,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
@@ -60,6 +60,19 @@ const CATEGORY_LABEL: Record<BadgeCategory, string> = {
 
 type GarageTab = 'catches' | 'collection' | 'market' | 'shop' | 'orbital';
 type CatchViewMode = 'grid' | '3d';
+type SortMode = 'date' | 'rarity_hi' | 'rarity_lo';
+
+const RARITY_ORDER: Record<string, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+const SORT_LABEL: Record<SortMode, string> = { date: 'DATE', rarity_hi: 'R↑', rarity_lo: 'R↓' };
+const SORT_NEXT: Record<SortMode, SortMode> = { date: 'rarity_hi', rarity_hi: 'rarity_lo', rarity_lo: 'date' };
+const FILTER_CHIPS: Array<{ key: string; label: string }> = [
+  { key: 'all', label: 'ALL' },
+  { key: 'legendary', label: 'LEG' },
+  { key: 'epic', label: 'EPIC' },
+  { key: 'rare', label: 'RARE' },
+  { key: 'uncommon', label: 'UNC' },
+  { key: 'common', label: 'CMN' },
+];
 
 const WHOLESALER_PRICES: Record<string, number> = {
   common:    10,
@@ -71,7 +84,7 @@ const WHOLESALER_PRICES: Record<string, number> = {
 
 // ─── CatchCard ───────────────────────────────────────────────────────────────
 
-function CatchCard({ item, onSellPress }: { item: CatchRecord; onSellPress?: (item: CatchRecord) => void }) {
+const CatchCard = memo(function CatchCard({ item, onSellPress }: { item: CatchRecord; onSellPress?: (item: CatchRecord) => void }) {
   const rarity = item.rarity ?? (
     item.confidence >= 0.9  ? 'epic'     :
     item.confidence >= 0.8  ? 'rare'     :
@@ -113,11 +126,11 @@ function CatchCard({ item, onSellPress }: { item: CatchRecord; onSellPress?: (it
       )}
     </Pressable>
   );
-}
+});
 
 // ─── BadgeCard ───────────────────────────────────────────────────────────────
 
-function BadgeCard({ badge }: { badge: Badge }) {
+const BadgeCard = memo(function BadgeCard({ badge }: { badge: Badge }) {
   const [expanded, setExpanded] = useState(false);
   const pct = badge.progress
     ? badge.progress.current / badge.progress.total
@@ -152,13 +165,12 @@ function BadgeCard({ badge }: { badge: Badge }) {
       )}
     </Pressable>
   );
-}
+});
 
 // ─── Collection Tab ───────────────────────────────────────────────────────────
 
-function CollectionTab({ catches }: { catches: CatchRecord[] }) {
-  const badges = useMemo(() => computeBadges(catches), [catches]);
-  const earned = badges.filter(b => b.earned).length;
+function CollectionTab({ badges }: { badges: Badge[] }) {
+  const earned = useMemo(() => badges.filter(b => b.earned).length, [badges]);
   const categories = ['enthusiast', 'grind', 'rarity', 'style', 'decade', 'social', 'collection'] as BadgeCategory[];
 
   return (
@@ -340,7 +352,7 @@ function MarketTab({ mycatches }: { mycatches: CatchRecord[] }) {
 
   useEffect(() => { fetchListings(); }, []);
 
-  const syncedForSale = mycatches.filter(c => c.synced);
+  const syncedForSale = mycatches;
 
   return (
     <View style={{ flex: 1 }}>
@@ -602,15 +614,13 @@ function SpaceCatchCard({ item, onSell }: { item: CatchRecord; onSell?: (item: C
 }
 
 function OrbitalTab({ catches, onSell }: { catches: CatchRecord[]; onSell: (item: CatchRecord) => void }) {
-  const spaceCatches = catches.filter(c => c.catchType === 'space');
-
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.orbtContainer} showsVerticalScrollIndicator={false}>
       <BoostStorageSection />
 
       <View style={styles.orbtSection}>
         <Text style={styles.orbtSectionTitle}>CAUGHT SATELLITES</Text>
-        {spaceCatches.length === 0 ? (
+        {catches.length === 0 ? (
           <View style={styles.orbtEmpty}>
             <Text style={styles.orbtEmptyTitle}>NONE YET</Text>
             <Text style={styles.orbtEmptyText}>
@@ -619,14 +629,14 @@ function OrbitalTab({ catches, onSell }: { catches: CatchRecord[]; onSell: (item
           </View>
         ) : (
           <View style={styles.spaceGrid}>
-            {spaceCatches.map(c => (
+            {catches.map(c => (
               <SpaceCatchCard key={c.id} item={c} onSell={onSell} />
             ))}
           </View>
         )}
       </View>
 
-      {spaceCatches.length > 0 && (
+      {catches.length > 0 && (
         <Text style={styles.sellHint}>Long-press any catch to sell to wholesaler</Text>
       )}
     </ScrollView>
@@ -746,11 +756,25 @@ export default function GarageScreen() {
   const [selling, setSelling] = useState(false);
   const [catchViewMode, setCatchViewMode] = useState<CatchViewMode>('3d');
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('date');
+  const [filterRarity, setFilterRarity] = useState('all');
 
-  const garageFull = !isSubscriber && catches.length >= FREE_GARAGE_LIMIT;
+  const garageFull   = !isSubscriber && catches.length >= FREE_GARAGE_LIMIT;
+  const pendingCount = useMemo(() => catches.filter(c => !c.synced).length, [catches]);
 
-  const pendingCount = catches.filter(c => !c.synced).length;
-  const earnedCount  = useMemo(() => computeBadges(catches).filter(b => b.earned).length, [catches]);
+  const badges     = useMemo(() => computeBadges(catches), [catches]);
+  const earnedCount = useMemo(() => badges.filter(b => b.earned).length, [badges]);
+
+  const spaceCatches  = useMemo(() => catches.filter(c => c.catchType === 'space'), [catches]);
+  const syncedCatches = useMemo(() => catches.filter(c => c.synced), [catches]);
+
+  const displayedCatches = useMemo(() => {
+    let list = filterRarity === 'all' ? catches : catches.filter(c => (c.rarity ?? 'common') === filterRarity);
+    if (sortMode === 'date')       return [...list].sort((a, b) => new Date(b.caughtAt).getTime() - new Date(a.caughtAt).getTime());
+    if (sortMode === 'rarity_hi')  return [...list].sort((a, b) => (RARITY_ORDER[b.rarity ?? 'common'] ?? 0) - (RARITY_ORDER[a.rarity ?? 'common'] ?? 0));
+    if (sortMode === 'rarity_lo')  return [...list].sort((a, b) => (RARITY_ORDER[a.rarity ?? 'common'] ?? 0) - (RARITY_ORDER[b.rarity ?? 'common'] ?? 0));
+    return list;
+  }, [catches, sortMode, filterRarity]);
 
   return (
     <View style={styles.container}>
@@ -822,27 +846,64 @@ export default function GarageScreen() {
           </View>
         ) : (
           <View style={{ flex: 1 }}>
+            {/* Controls row: count + sort cycle + view toggle */}
             <View style={styles.viewToggleRow}>
-              <Text style={styles.count}>{catches.length} vehicles</Text>
-              <View style={styles.viewToggle}>
-                {(['3d', 'grid'] as CatchViewMode[]).map(mode => (
-                  <Pressable
-                    key={mode}
-                    style={[styles.toggleBtn, catchViewMode === mode && styles.toggleBtnActive]}
-                    onPress={() => setCatchViewMode(mode)}
-                  >
-                    <Text style={[styles.toggleText, catchViewMode === mode && styles.toggleTextActive]}>
-                      {mode.toUpperCase()}
-                    </Text>
-                  </Pressable>
-                ))}
+              <Text style={styles.count}>
+                {displayedCatches.length}{filterRarity !== 'all' ? `/${catches.length}` : ''} vehicles
+              </Text>
+              <View style={styles.controlsRight}>
+                <Pressable
+                  style={styles.sortBtn}
+                  onPress={() => setSortMode(m => SORT_NEXT[m])}
+                >
+                  <Text style={styles.sortBtnText}>{SORT_LABEL[sortMode]}</Text>
+                </Pressable>
+                <View style={styles.viewToggle}>
+                  {(['3d', 'grid'] as CatchViewMode[]).map(mode => (
+                    <Pressable
+                      key={mode}
+                      style={[styles.toggleBtn, catchViewMode === mode && styles.toggleBtnActive]}
+                      onPress={() => setCatchViewMode(mode)}
+                    >
+                      <Text style={[styles.toggleText, catchViewMode === mode && styles.toggleTextActive]}>
+                        {mode.toUpperCase()}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             </View>
+            {/* Rarity filter chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
+            >
+              {FILTER_CHIPS.map(chip => (
+                <Pressable
+                  key={chip.key}
+                  style={[
+                    styles.filterChip,
+                    filterRarity === chip.key && styles.filterChipActive,
+                    chip.key !== 'all' && filterRarity === chip.key && { borderColor: RARITY_ACCENT[chip.key] + '88' },
+                  ]}
+                  onPress={() => setFilterRarity(chip.key)}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    filterRarity === chip.key && styles.filterChipTextActive,
+                    chip.key !== 'all' && filterRarity === chip.key && { color: RARITY_ACCENT[chip.key] },
+                  ]}>
+                    {chip.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
             {catchViewMode === '3d' ? (
-              <GarageCarousel catches={catches} onSellPress={setSellTarget} />
+              <GarageCarousel catches={displayedCatches} onSellPress={setSellTarget} />
             ) : (
               <FlatList
-                data={catches}
+                data={displayedCatches}
                 keyExtractor={item => item.id}
                 numColumns={2}
                 renderItem={({ item }) => (
@@ -851,19 +912,28 @@ export default function GarageScreen() {
                 contentContainerStyle={styles.grid}
                 columnWrapperStyle={styles.row}
                 showsVerticalScrollIndicator={false}
+                initialNumToRender={8}
+                maxToRenderPerBatch={6}
+                windowSize={10}
+                removeClippedSubviews
               />
             )}
-            {catchViewMode === 'grid' && (
+            {catchViewMode === 'grid' && displayedCatches.length > 0 && (
               <Text style={styles.sellHint}>Long-press any car to sell to wholesaler</Text>
+            )}
+            {displayedCatches.length === 0 && (
+              <View style={styles.empty}>
+                <Text style={styles.emptyText}>No {filterRarity !== 'all' ? filterRarity : ''} catches yet.</Text>
+              </View>
             )}
           </View>
         )
       )}
 
-      {activeTab === 'collection' && <CollectionTab catches={catches} />}
-      {activeTab === 'market' && <MarketTab mycatches={catches} />}
+      {activeTab === 'collection' && <CollectionTab badges={badges} />}
+      {activeTab === 'market' && <MarketTab mycatches={syncedCatches} />}
       {activeTab === 'shop' && <ShopTab />}
-      {activeTab === 'orbital' && <OrbitalTab catches={catches} onSell={setSellTarget} />}
+      {activeTab === 'orbital' && <OrbitalTab catches={spaceCatches} onSell={setSellTarget} />}
 
       {/* Sell to Wholesaler modal */}
       <Modal
@@ -968,15 +1038,23 @@ const styles = StyleSheet.create({
   tabTextActive:   { color: '#fff' },
 
   // Catches tab
-  viewToggleRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
-  count:           { color: '#555', fontSize: 13 },
-  viewToggle:      { flexDirection: 'row', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 6, overflow: 'hidden' },
-  toggleBtn:       { paddingHorizontal: 10, paddingVertical: 5 },
-  toggleBtnActive: { backgroundColor: '#1a1a1a' },
-  toggleText:      { color: '#444', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  toggleTextActive:{ color: '#fff' },
-  grid:            { padding: 12, paddingBottom: 40 },
-  row:             { gap: 10, marginBottom: 10 },
+  viewToggleRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
+  count:              { color: '#555', fontSize: 13 },
+  controlsRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sortBtn:            { borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 },
+  sortBtnText:        { color: '#888', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  viewToggle:         { flexDirection: 'row', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 6, overflow: 'hidden' },
+  toggleBtn:          { paddingHorizontal: 10, paddingVertical: 5 },
+  toggleBtnActive:    { backgroundColor: '#1a1a1a' },
+  toggleText:         { color: '#444', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  toggleTextActive:   { color: '#fff' },
+  filterRow:          { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
+  filterChip:         { borderWidth: 1, borderColor: '#222', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  filterChipActive:   { borderColor: '#555', backgroundColor: '#1a1a1a' },
+  filterChipText:     { color: '#444', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  filterChipTextActive:{ color: '#fff' },
+  grid:               { padding: 12, paddingBottom: 40 },
+  row:                { gap: 10, marginBottom: 10 },
 
   // Catch card
   card:            { flex: 1, borderRadius: 12, borderWidth: 1, padding: 14, gap: 8, minHeight: 160 },

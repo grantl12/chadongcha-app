@@ -14,8 +14,11 @@ Usage:
 import asyncio
 import logging
 import math
+import os
 import sys
 from datetime import datetime, timezone, timedelta
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Configure logging before any imports that could fail, so startup errors are visible.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

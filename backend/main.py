@@ -21,7 +21,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     ph.capture(
         "backend_error",
         "exception",
-        {
+        properties={
             "error":     type(exc).__name__,
             "message":   str(exc),
             "path":      str(request.url.path),

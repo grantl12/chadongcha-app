@@ -153,6 +153,9 @@ class GuessBody(BaseModel):
     card_id: str
     guess: str
 
+GHOST_QUORUM           = 3   # votes on a single catch to ghost-confirm it
+GHOST_PROMOTION_COUNT  = 5   # unique catches ghost-confirmed to flag as promotion_ready
+
 @router.post("/suggest")
 async def suggest_id(body: SuggestBody, authorization: str = Header(...)):
     db = get_client()
@@ -160,14 +163,97 @@ async def suggest_id(body: SuggestBody, authorization: str = Header(...)):
     unk = db.table("unknown_catches").select("id, status").eq("id", body.unknown_catch_id).maybe_single().execute()
     if not unk or not unk.data:
         raise HTTPException(status_code=404, detail="Unknown catch not found")
-    if unk.data["status"] != "open":
+    if unk.data["status"] not in ("open",):
         raise HTTPException(status_code=409, detail="This catch is already identified")
+
     generation_id = _resolve_generation(db, body.make, body.model, body.generation)
-    if not generation_id:
-        raise HTTPException(status_code=422, detail="Could not find a matching vehicle.")
-    db.table("id_suggestions").upsert({"unknown_catch_id": body.unknown_catch_id, "player_id": player_id, "generation_id": generation_id}, on_conflict="unknown_catch_id,player_id").execute()
-    _maybe_auto_confirm(db, body.unknown_catch_id)
-    return {"ok": True, "generation_id": generation_id}
+    if generation_id:
+        # Known vehicle — normal suggestion flow
+        db.table("id_suggestions").upsert(
+            {"unknown_catch_id": body.unknown_catch_id, "player_id": player_id, "generation_id": generation_id},
+            on_conflict="unknown_catch_id,player_id",
+        ).execute()
+        _maybe_auto_confirm(db, body.unknown_catch_id)
+        return {"ok": True, "generation_id": generation_id, "ghost": False}
+
+    # Unknown vehicle — route into ghost class pipeline
+    ghost_id = _upsert_ghost_class(db, body.make, body.model, body.generation or "")
+    try:
+        db.table("ghost_class_votes").insert({
+            "ghost_class_id":   ghost_id,
+            "unknown_catch_id": body.unknown_catch_id,
+            "player_id":        player_id,
+        }).execute()
+    except Exception:
+        pass  # duplicate vote — ignore
+    _maybe_ghost_confirm(db, body.unknown_catch_id, ghost_id)
+    return {"ok": True, "ghost": True, "ghost_class_id": ghost_id}
+
+
+def _upsert_ghost_class(db, make: str, model: str, generation_label: str) -> str:
+    """Find or create a ghost class entry, return its id."""
+    existing = (
+        db.table("ghost_classes")
+        .select("id")
+        .ilike("make", make)
+        .ilike("model", model)
+        .ilike("generation_label", generation_label or "")
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        return existing.data[0]["id"]
+    res = db.table("ghost_classes").insert({
+        "make": make.strip(),
+        "model": model.strip(),
+        "generation_label": generation_label.strip(),
+    }).execute()
+    return res.data[0]["id"]
+
+
+def _maybe_ghost_confirm(db, unknown_catch_id: str, ghost_class_id: str) -> None:
+    """If GHOST_QUORUM votes point to this ghost class for this catch, ghost-confirm it."""
+    vote_res = db.table("ghost_class_votes") \
+        .select("id") \
+        .eq("unknown_catch_id", unknown_catch_id) \
+        .eq("ghost_class_id", ghost_class_id) \
+        .execute()
+    if len(vote_res.data or []) < GHOST_QUORUM:
+        return
+
+    # Mark this catch as ghost-confirmed
+    db.table("unknown_catches").update({
+        "status":        "confirmed",
+        "ghost_class_id": ghost_class_id,
+    }).eq("id", unknown_catch_id).execute()
+
+    # Tally unique confirmed catches for this ghost class and maybe promote
+    confirmed_res = db.table("unknown_catches") \
+        .select("id") \
+        .eq("ghost_class_id", ghost_class_id) \
+        .eq("status", "confirmed") \
+        .execute()
+    catch_count = len(confirmed_res.data or [])
+
+    voter_res = db.table("ghost_class_votes") \
+        .select("player_id") \
+        .eq("ghost_class_id", ghost_class_id) \
+        .execute()
+    unique_voters = len({r["player_id"] for r in (voter_res.data or [])})
+
+    # Pull sample image refs (up to 5) from confirmed catches
+    img_refs = []
+    for row in (confirmed_res.data or [])[:5]:
+        uc = db.table("unknown_catches").select("community_photo_ref").eq("id", row["id"]).maybe_single().execute()
+        if uc and uc.data and uc.data.get("community_photo_ref"):
+            img_refs.append(uc.data["community_photo_ref"])
+
+    update: dict = {"catch_count": catch_count, "unique_voter_count": unique_voters, "sample_image_refs": img_refs}
+    if catch_count >= GHOST_PROMOTION_COUNT:
+        update["status"] = "promotion_ready"
+
+    db.table("ghost_classes").update(update).eq("id", ghost_class_id).execute()
+
 
 def _maybe_auto_confirm(db, unknown_catch_id: str) -> None:
     QUORUM = 3
@@ -197,6 +283,22 @@ def _maybe_auto_confirm(db, unknown_catch_id: str) -> None:
         if xp > 0:
             reasons.append("community_id_confirmed")
             apply_xp(db, catch_row.data["player_id"], xp, catch_id, reasons)
+
+
+@router.get("/ghost-classes")
+async def list_ghost_classes(status: str = "accumulating", limit: int = 50):
+    """List ghost classes — used by the training pipeline and discovery UI."""
+    db = get_client()
+    valid = {"accumulating", "promotion_ready", "promoted"}
+    if status not in valid:
+        raise HTTPException(status_code=422, detail=f"status must be one of {valid}")
+    res = db.table("ghost_classes") \
+        .select("id, make, model, generation_label, catch_count, unique_voter_count, sample_image_refs, status, created_at") \
+        .eq("status", status) \
+        .order("catch_count", desc=True) \
+        .limit(limit) \
+        .execute()
+    return res.data or []
 
 # --- ID Game Mini-game ---
 

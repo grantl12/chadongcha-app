@@ -152,7 +152,8 @@ def phase_info():
         print(f"  {i:3d}  {cls}")
 
 
-def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
+def phase_classify(epochs: int, resume: bool = False, patience: int = 10,
+                   use_sam: bool = False, freeze_backbone: bool = False):
     try:
         import torch
         import torch.nn as nn
@@ -254,11 +255,30 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
     elif resume:
         print("No checkpoint found — starting from pretrained weights.")
 
+    if freeze_backbone:
+        # Incremental class addition: lock the feature extractor so only the
+        # classifier head trains. Safe because MobileNetV3's backbone already
+        # learned vehicle features; new classes only need the head to adapt.
+        for name, param in model.named_parameters():
+            if "classifier" not in name:
+                param.requires_grad = False
+        trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        total     = sum(p.numel() for p in model.parameters())
+        print(f"Backbone frozen — training {trainable:,} / {total:,} params (classifier head only)")
+
     model = model.to(device)
 
-    # SGD+momentum uses only basic multiply/add ops — fully supported on DirectML.
+    # SGD+momentum: only basic multiply/add ops — fully supported on DirectML.
     # AdamW's lerp_ (momentum EMA) is not supported and falls back to CPU.
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    # SAM wraps SGD for sharpness-aware training (better generalization, ~2× slower).
+    _sgd_kwargs = dict(lr=0.01, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    if use_sam:
+        from sam import SAM  # noqa: PLC0415
+        optimizer = SAM(model.parameters(), torch.optim.SGD, rho=0.05, **_sgd_kwargs)
+        print("Optimizer: SAM (ρ=0.05, base=SGD)")
+    else:
+        optimizer = torch.optim.SGD(model.parameters(), **_sgd_kwargs)
+        print("Optimizer: SGD+momentum")
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
@@ -272,10 +292,17 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
         running_loss = 0.0
         for imgs, labels in train_loader:
             imgs, labels = imgs.to(device), labels.to(device)
-            optimizer.zero_grad()
-            loss = criterion(model(imgs), labels)
-            loss.backward()
-            optimizer.step()
+            if use_sam:
+                loss = criterion(model(imgs), labels)
+                loss.backward()
+                optimizer.first_step(zero_grad=True)
+                criterion(model(imgs), labels).backward()
+                optimizer.second_step(zero_grad=True)
+            else:
+                optimizer.zero_grad()
+                loss = criterion(model(imgs), labels)
+                loss.backward()
+                optimizer.step()
             running_loss += loss.item()
         scheduler.step()
 
@@ -449,7 +476,11 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--resume", action="store_true", help="Resume from best.pt checkpoint")
     parser.add_argument("--patience", type=int, default=10,
-                        help="Early stopping: epochs without val_acc improvement before stopping (default 10)")
+                        help="Early stopping: epochs without val_acc improvement (default 10)")
+    parser.add_argument("--optimizer", choices=["sgd", "sam"], default="sgd",
+                        help="sgd (default) or sam (sharpness-aware, ~2x slower, better generalization)")
+    parser.add_argument("--freeze-backbone", dest="freeze_backbone", action="store_true",
+                        help="Freeze feature extractor, train classifier head only (incremental class addition)")
     parser.add_argument("--data-dir", dest="data_dir", default=None,
                         help="Override image dataset directory (default: ml/data/images)")
     args = parser.parse_args()
@@ -462,6 +493,7 @@ if __name__ == "__main__":
     if args.phase == "info":
         phase_info()
     elif args.phase == "classify":
-        phase_classify(args.epochs, resume=args.resume, patience=args.patience)
+        phase_classify(args.epochs, resume=args.resume, patience=args.patience,
+                       use_sam=(args.optimizer == "sam"), freeze_backbone=args.freeze_backbone)
     elif args.phase == "export":
         phase_export()

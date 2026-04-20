@@ -24,6 +24,7 @@ export const MAX_STORED_BOOSTS = 5;
 type PlayerStore = {
   userId: string | null;
   username: string | null;
+  provider: string | null;
   xp: number;
   level: number;
   credits: number;
@@ -37,7 +38,7 @@ type PlayerStore = {
   storedBoosts: StoredBoost[];
   pendingBoostDecision: PendingBoostDecision | null;
 
-  setPlayer: (data: { userId: string; username: string; accessToken: string }) => void;
+  setPlayer: (data: { userId: string; username: string; accessToken: string; provider?: string }) => void;
   setProfile: (xp: number, level: number) => void;
   setFullProfile: (data: {
     xp: number; level: number; credits: number;
@@ -69,6 +70,7 @@ export const usePlayerStore = create<PlayerStore>()(
     (set) => ({
       userId: null,
       username: null,
+      provider: null,
       xp: 0,
       level: 1,
       credits: 0,
@@ -82,8 +84,8 @@ export const usePlayerStore = create<PlayerStore>()(
       storedBoosts: [],
       pendingBoostDecision: null,
 
-      setPlayer({ userId, username, accessToken }) {
-        set({ userId, username, accessToken });
+      setPlayer({ userId, username, accessToken, provider }) {
+        set({ userId, username, accessToken, ...(provider ? { provider } : {}) });
       },
 
       setProfile(xp, level) {

@@ -106,7 +106,7 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
         username: string; xp: number; level: number; credits: number;
         crew_id: string | null; is_subscriber: boolean;
       };
-      setPlayer({ userId, username: profile.username, accessToken });
+      setPlayer({ userId, username: profile.username, accessToken, provider });
       setFullProfile({
         xp: profile.xp, level: profile.level, credits: profile.credits,
         crewId: profile.crew_id, isSubscriber: profile.is_subscriber,
@@ -115,7 +115,7 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
       onSuccess();
     } catch {
       // 404 → new OAuth user, needs a username
-      setPlayer({ userId, username: '', accessToken });
+      setPlayer({ userId, username: '', accessToken, provider });
       posthog.capture('auth_success', { provider, mode: 'sso', is_new_user: true });
       onNeedsUsername(accessToken, userId);
     }
@@ -191,7 +191,7 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
           if (res.refresh_token) {
             await supabase.auth.setSession({ access_token: res.access_token, refresh_token: res.refresh_token });
           }
-          setPlayer({ userId: res.user_id, username, accessToken: res.access_token });
+          setPlayer({ userId: res.user_id, username, accessToken: res.access_token, provider: 'email' });
           posthog.capture('auth_success', { provider: 'email', mode: 'signup' });
           onSuccess();
           return;
@@ -206,10 +206,10 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
         access_token: string; refresh_token: string; user_id: string;
       };
       await supabase.auth.setSession({ access_token: res.access_token, refresh_token: res.refresh_token });
-      setPlayer({ userId: res.user_id, username: email.split('@')[0], accessToken: res.access_token });
+      setPlayer({ userId: res.user_id, username: email.split('@')[0], accessToken: res.access_token, provider: 'email' });
       try {
         const profile = await apiClient.get('/auth/me') as { username: string; xp: number; level: number };
-        setPlayer({ userId: res.user_id, username: profile.username, accessToken: res.access_token });
+        setPlayer({ userId: res.user_id, username: profile.username, accessToken: res.access_token, provider: 'email' });
         setProfile(profile.xp, profile.level);
       } catch { /* non-fatal */ }
       posthog.capture('auth_success', { provider: 'email', mode: 'signin' });

@@ -11,18 +11,22 @@ import { posthog } from '@/lib/posthog';
 const queryClient = new QueryClient();
 
 function PostHogTracker() {
-  const userId = usePlayerStore(s => s.userId);
+  const userId   = usePlayerStore(s => s.userId);
   const username = usePlayerStore(s => s.username);
+  const provider = usePlayerStore(s => s.provider);
   const pathname = usePathname();
   const params = useLocalSearchParams();
 
   useEffect(() => {
     if (userId) {
-      posthog.identify(userId, username ? { username } : {});
+      posthog.identify(userId, {
+        ...(username ? { username } : {}),
+        ...(provider ? { provider } : {}),
+      });
     } else {
       posthog.reset();
     }
-  }, [userId, username]);
+  }, [userId, username, provider]);
 
   useEffect(() => {
     posthog.screen(pathname, params);

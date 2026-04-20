@@ -3,6 +3,9 @@ name: EAS Preview Build
 on:
   push:
     branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/eas-build.yml'
   workflow_dispatch:
     inputs:
       platform:

@@ -45,33 +45,35 @@ the builds complete.
 
 ---
 
-## Satellite Events — NOT WORKING
+## Satellite Events — ROOT CAUSE FOUND AND FIXED (commit `7f2b226`)
 
-**Status: Broken. Zero satellite events have ever been seen because `catchable_objects`
-table is empty.**
+**Status: Code fix is pushed. Needs Railway to redeploy the sat-worker.**
 
-**Confirmed:** `GET /satellites/catchable?lat=40.71&lon=-74.00` returns `[]`.
+**Root cause:** Celestrak migrated their API. The old URLs in the worker:
+```
+https://celestrak.org/SPACETRACK/query/class/gp/GROUP/stations/format/tle
+```
+All return **404**. CelesTrak now uses:
+```
+https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=TLE
+```
+The worker's `refresh_tle_db()` was silently catching the 404 errors, logging them,
+and continuing. `space_objects` table stayed empty. `compute_passes()` always returned
+early. `catchable_objects` never got populated. Zero satellite events ever.
 
-**Root cause options (one of these is true — check Railway to know which):**
-1. The `sat-worker` Railway service was never deployed / is not running
-2. The `sat-worker` crashed and hit its 3-retry limit (`restartPolicyMaxRetries = 3`),
-   so Railway stopped trying
-3. The worker is running but its TLE fetch from Celestrak is failing (rate limit, timeout,
-   or changed URL format)
+**Fix applied:** All three group URLs updated to the working `/NORAD/elements/gp.php`
+format. Verified all three return valid TLE data.
 
-**What needs to happen to fix this:**
-1. Open Railway dashboard → navigate to `sat-worker` service
-2. Check if it is running. If not running, check the crash logs.
-3. If the Celestrak TLE URL is returning errors, the worker will log it but silently
-   keep running (it only `log.error`s, doesn't crash). The `space_objects` table might
-   be empty, which means `compute_passes()` returns early (`if not rows.data: return`).
-4. If everything looks running but the table is still empty, manually trigger one cycle
-   by hitting Celestrak directly and verifying the format hasn't changed.
+**Action required:**
+1. Railway should auto-redeploy the sat-worker on the push to main (watchPatterns includes `backend/**`)
+2. Confirm the sat-worker service shows "Deploying" or "Active" in Railway dashboard
+3. After it's running, wait up to 10 min for the first pass computation cycle
+4. Test: `curl "https://chadongcha-production.up.railway.app/satellites/catchable?lat=40.71&lon=-74.00"` should return a non-empty array
 
-**The `/satellites/catchable` endpoint also has a design note:**
+**The `/satellites/catchable` endpoint design note:**
 It accepts `lat`/`lon` params but doesn't use them — returns all globally active passes.
-This is fine once the worker is running (you'd see passes from anywhere), but lat/lon
-filtering per-user would be cleaner. Not the priority right now.
+This is fine for now (you'd see passes from anywhere), but it means it's a global feed
+of all currently overhead objects, not filtered to your specific location.
 
 ---
 
@@ -85,8 +87,8 @@ filtering per-user would be cleaner. Not the priority right now.
 | Highway (Dash Sentry) | ⚠️ Unverified | Code looks correct but no confirmed DB writes yet |
 | 360° Scan | ⚠️ Unverified | Same — no confirmed DB writes yet |
 | Feed | ⚠️ Unverified | Will show data once catches start writing |
-| Satellite events | ❌ Broken | `catchable_objects` is empty — sat-worker issue |
-| Push notifications (sat) | ❌ Broken | Depends on sat-worker being fixed first |
+| Satellite events | ⚠️ Fixed in code, needs Railway redeploy | Celestrak URL fix pushed — `catchable_objects` should populate once sat-worker redeploys |
+| Push notifications (sat) | ⚠️ Blocked on sat-worker redeploy | Logic looks correct; needs data to flow first |
 | Road King / Territory | ⚠️ Unverified | Logic looks correct; needs actual catches to test |
 | Garage / Collections | ✅ Working | Banner fix applied; data shows from local store |
 | Leaderboard | ⚠️ Unverified | Backend uses direct DB, not Redis yet (TODO in code) |
@@ -94,7 +96,7 @@ filtering per-user would be cleaner. Not the priority right now.
 | Market | ⚠️ Unverified | Code complete |
 | Identify mini-game | ⚠️ Unverified | Code complete |
 | Badges | ⚠️ Unverified | Computed locally from catch store; should work |
-| Satellite catch (Space mode) | ❌ Blocked | Blocked on sat-worker fix |
+| Satellite catch (Space mode) | ⚠️ Blocked on sat-worker redeploy | Fix pushed; needs Railway redeploy to test |
 
 ---
 

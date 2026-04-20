@@ -156,28 +156,33 @@ async def fetch_tles(url: str) -> list[tuple[str, str, str]]:
     ]
 
 
+UPSERT_BATCH_SIZE = 500
+
 async def refresh_tle_db() -> None:
     """Pull latest TLEs from Celestrak and upsert into space_objects."""
     db = get_client()
+    updated_at = datetime.now(timezone.utc).isoformat()
     for group, url in CELESTRAK_GROUPS.items():
         try:
             tles = await fetch_tles(url)
             log.info("Fetched %d TLEs for group '%s'", len(tles), group)
-            for name, line1, line2 in tles:
-                norad_id = int(line1[2:7])
-                db.table("space_objects").upsert(
-                    {
-                        "norad_id":       norad_id,
-                        "name":           name.strip(),
-                        "object_type":    _classify(name),
-                        "rarity_tier":    _rarity(name),
-                        "tle_line1":      line1,
-                        "tle_line2":      line2,
-                        "tle_updated_at": datetime.now(timezone.utc).isoformat(),
-                        "active":         True,
-                    },
-                    on_conflict="norad_id",
-                ).execute()
+            records = [
+                {
+                    "norad_id":       int(line1[2:7]),
+                    "name":           name.strip(),
+                    "object_type":    _classify(name),
+                    "rarity_tier":    _rarity(name),
+                    "tle_line1":      line1,
+                    "tle_line2":      line2,
+                    "tle_updated_at": updated_at,
+                    "active":         True,
+                }
+                for name, line1, line2 in tles
+            ]
+            for i in range(0, len(records), UPSERT_BATCH_SIZE):
+                batch = records[i : i + UPSERT_BATCH_SIZE]
+                db.table("space_objects").upsert(batch, on_conflict="norad_id").execute()
+                log.info("  upserted %d/%d for '%s'", min(i + UPSERT_BATCH_SIZE, len(records)), len(records), group)
         except Exception as exc:
             log.error("TLE refresh failed for group '%s': %s", group, exc)
 

@@ -20,11 +20,12 @@ from db import get_client
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-# Celestrak TLE group endpoints
+# Celestrak TLE group endpoints (GP data API — /NORAD/elements/gp.php)
+# Note: the old /SPACETRACK/query/class/gp/ path returns 404 as of 2024.
 CELESTRAK_GROUPS = {
-    "stations": "https://celestrak.org/SPACETRACK/query/class/gp/GROUP/stations/format/tle",
-    "starlink":  "https://celestrak.org/SPACETRACK/query/class/gp/GROUP/starlink/format/tle",
-    "visual":    "https://celestrak.org/SPACETRACK/query/class/gp/GROUP/visual/format/tle",
+    "stations": "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=TLE",
+    "starlink":  "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE",
+    "visual":    "https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=TLE",
 }
 
 PASS_WINDOW_HOURS   = 12       # how far ahead to predict passes

@@ -26,6 +26,8 @@ mobile/android/
 # ML data
 ml/data/images/
 ml/data/images.zip
+ml/data/images_flagged/
+ml/.venv310/
 
 # Model binaries — both tracked in git; force-add after retraining
 # mlpackage ~8 MB (iOS CoreML), tflite ~8 MB (Android)

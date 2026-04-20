@@ -40,7 +40,15 @@
       "Bash(taskkill /F /FI \"WINDOWTITLE eq *bootstrap*\")",
       "Bash(gh run *)",
       "Bash(pip install *)",
-      "Bash(ruff check *)"
+      "Bash(ruff check *)",
+      "Bash(git push *)",
+      "Bash(PYTHONPATH=. python workers/satellite_tracker.py --once)",
+      "Bash(py -3.12 --version)",
+      "Bash(py -3.11 --version)",
+      "Bash(py -3.10 --version)",
+      "Bash(py -3.9 --version)",
+      "Bash(py -3.10 -m pip install sgp4 httpx supabase python-dotenv pydantic pydantic-settings -q)",
+      "Bash(PYTHONPATH=. py -3.10 workers/satellite_tracker.py --once)"
     ]
   }
 }

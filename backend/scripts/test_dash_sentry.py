@@ -34,7 +34,10 @@ if os.path.exists(_env_path):
 
 API_BASE = "https://chadongcha-production.up.railway.app"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+SUPABASE_SERVICE_KEY = (
+    os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("SUPABASE_SERVICE_KEY", "")
+)
 
 
 # ---------------------------------------------------------------------------

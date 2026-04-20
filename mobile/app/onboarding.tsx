@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Pressable,
   ActivityIndicator, KeyboardAvoidingView, Platform,
-  ScrollView, Animated,
+  ScrollView, Animated, Switch, Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
@@ -12,8 +12,10 @@ import { makeRedirectUri } from 'expo-auth-session';
 import { Camera } from 'react-native-vision-camera';
 import * as Notifications from 'expo-notifications';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { apiClient } from '@/api/client';
 import { supabase } from '@/lib/supabase';
+import { posthog } from '@/lib/posthog';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -65,7 +67,10 @@ function SplashStep({ onNext }: { onNext: () => void }) {
         ))}
       </View>
 
-      <Pressable style={styles.primaryButton} onPress={onNext}>
+      <Pressable style={styles.primaryButton} onPress={() => {
+        posthog.capture('onboarding_started');
+        onNext();
+      }}>
         <Text style={styles.buttonText}>GET STARTED</Text>
       </Pressable>
 
@@ -95,7 +100,7 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
 
   // After SSO: if the player already has a profile, go to permissions;
   // if not (new user), go to the username picker.
-  async function finishOAuthSession(accessToken: string, userId: string) {
+  async function finishOAuthSession(accessToken: string, userId: string, provider: string) {
     try {
       const profile = await apiClient.get('/auth/me') as {
         username: string; xp: number; level: number; credits: number;
@@ -106,10 +111,12 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
         xp: profile.xp, level: profile.level, credits: profile.credits,
         crewId: profile.crew_id, isSubscriber: profile.is_subscriber,
       });
+      posthog.capture('auth_success', { provider, mode: 'sso', is_new_user: false });
       onSuccess();
     } catch {
       // 404 → new OAuth user, needs a username
       setPlayer({ userId, username: '', accessToken });
+      posthog.capture('auth_success', { provider, mode: 'sso', is_new_user: true });
       onNeedsUsername(accessToken, userId);
     }
   }
@@ -129,11 +136,12 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
         token:    credential.identityToken!,
       });
       if (sbError || !data.session) throw sbError ?? new Error('No session');
-      await finishOAuthSession(data.session.access_token, data.session.user.id);
+      await finishOAuthSession(data.session.access_token, data.session.user.id, 'apple');
     } catch (e: unknown) {
       const code = (e as any)?.code;
       if (code === 'ERR_REQUEST_CANCELED') { setSsoLoading(null); return; }
       setError('Apple sign in failed. Try again.');
+      posthog.capture('auth_failed', { provider: 'apple', error: String(e) });
     } finally {
       setSsoLoading(null);
     }
@@ -158,9 +166,10 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
       if (!code) throw new Error('No auth code in redirect');
       const { data: sessionData, error: sessionErr } = await supabase.auth.exchangeCodeForSession(code);
       if (sessionErr || !sessionData.session) throw sessionErr ?? new Error('No session');
-      await finishOAuthSession(sessionData.session.access_token, sessionData.session.user.id);
+      await finishOAuthSession(sessionData.session.access_token, sessionData.session.user.id, 'google');
     } catch (e: unknown) {
       setError('Google sign in failed. Try again.');
+      posthog.capture('auth_failed', { provider: 'google', error: String(e) });
     } finally {
       setSsoLoading(null);
     }
@@ -183,6 +192,7 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
             await supabase.auth.setSession({ access_token: res.access_token, refresh_token: res.refresh_token });
           }
           setPlayer({ userId: res.user_id, username, accessToken: res.access_token });
+          posthog.capture('auth_success', { provider: 'email', mode: 'signup' });
           onSuccess();
           return;
         }
@@ -202,11 +212,13 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
         setPlayer({ userId: res.user_id, username: profile.username, accessToken: res.access_token });
         setProfile(profile.xp, profile.level);
       } catch { /* non-fatal */ }
+      posthog.capture('auth_success', { provider: 'email', mode: 'signin' });
       onSuccess();
     } catch (e: unknown) {
       const msg   = e instanceof Error ? e.message : 'Something went wrong';
       const match = msg.match(/→ \d+: (.*)/);
       setError(match ? match[1] : msg);
+      posthog.capture('auth_failed', { provider: 'email', error: msg });
     } finally {
       setLoading(false);
     }
@@ -345,6 +357,7 @@ function UsernameStep({ token, userId, onSuccess }: {
         xp: profile.xp, level: profile.level, credits: profile.credits,
         crewId: profile.crew_id, isSubscriber: profile.is_subscriber,
       });
+      posthog.capture('username_set', { username: profile.username });
       onSuccess();
     } catch (e: unknown) {
       const msg   = e instanceof Error ? e.message : 'Something went wrong';
@@ -469,6 +482,7 @@ function PermRow({
 }
 
 function PermissionsStep({ onDone }: { onDone: () => void }) {
+  const { contributeScans, toggleContributeScans } = useSettingsStore();
   const [perms, setPerms] = useState<PermState>({
     location:      'pending',
     camera:        'pending',
@@ -486,10 +500,20 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
       }
       return next;
     });
+
+    posthog.capture('permissions_updated', {
+      permission: key,
+      status: result,
+    });
   }
 
   const allResolved = Object.values(perms).every(s => s !== 'pending');
   const coreGranted = perms.location !== 'denied' && perms.camera !== 'denied';
+
+  const handleOpenPrivacy = () => {
+    posthog.capture('privacy_policy_viewed', { source: 'onboarding' });
+    Linking.openURL('https://chadongcha.com/privacy');
+  };
 
   return (
     <View style={styles.permContainer}>
@@ -510,6 +534,29 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
             onRequest={() => handleRequest(p.key, p.request)}
           />
         ))}
+
+        {/* Data Contribution Toggle (4th Row) */}
+        <View style={styles.permRow}>
+          <Text style={styles.permIcon}>🧪</Text>
+          <View style={styles.permBody}>
+            <Text style={styles.permTitle}>Contribute Scans</Text>
+            <Text style={styles.permDesc}>
+              Anonymize and share scan photos to help retrain the AI model.{' '}
+              <Text style={styles.privacyLink} onPress={handleOpenPrivacy}>
+                Privacy Policy
+              </Text>
+            </Text>
+          </View>
+          <Switch
+            value={contributeScans}
+            onValueChange={(val) => {
+              toggleContributeScans();
+              posthog.capture(val ? 'data_sharing_opt_in' : 'data_sharing_opt_out', { source: 'onboarding' });
+            }}
+            trackColor={{ false: '#222', true: '#4a9eff' }}
+            thumbColor="#fff"
+          />
+        </View>
       </View>
 
       {allResolved && (
@@ -522,7 +569,10 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
               Location and Camera are required for core gameplay. You can grant them in Settings.
             </Text>
           )}
-          <Pressable style={styles.primaryButton} onPress={onDone}>
+          <Pressable style={styles.primaryButton} onPress={() => {
+            posthog.capture('onboarding_complete');
+            onDone();
+          }}>
             <Text style={styles.buttonText}>
               {coreGranted ? "LET'S GO" : 'CONTINUE ANYWAY'}
             </Text>
@@ -637,6 +687,7 @@ const styles = StyleSheet.create({
   permDenied:         { color: '#333', fontSize: 18, fontWeight: '700', width: 32, textAlign: 'center' },
   permFooter:         { marginTop: 32, gap: 12 },
   permWarning:        { color: '#f59e0b', fontSize: 13, lineHeight: 18 },
+  privacyLink:        { color: '#4a9eff', textDecorationLine: 'underline', fontSize: 12, fontWeight: '600' },
 
   // Shared
   primaryButton:      { backgroundColor: '#e63946', borderRadius: 8, paddingVertical: 16, alignItems: 'center' },

@@ -184,6 +184,13 @@ export default function DashSentry() {
     detectionTimer.current = setTimeout(() => setDetectionState('idle'), delay);
   }, []);
 
+  useEffect(() => {
+    posthog.capture('dash_sentry_started');
+    return () => {
+      posthog.capture('dash_sentry_stopped');
+    };
+  }, []);
+
   const handleCatch = useCallback((result: ClassifyResult) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addCatch({

@@ -11,7 +11,12 @@ class Settings(BaseSettings):
     )
 
     supabase_url: str
-    supabase_service_key: str
+    supabase_service_key: str = ""
+    supabase_service_role_key: str = ""
+
+    @property
+    def effective_service_key(self) -> str:
+        return self.supabase_service_role_key or self.supabase_service_key
     # Plain string — split on comma where needed (avoids pydantic-settings
     # trying to JSON-decode a list field from an env var string)
     allowed_origins: str = "http://localhost:8081"

@@ -8,6 +8,7 @@ import { VehicleClassifier, VehicleClassifierStub, type ClassifyResult } from '@
 import { useLocation } from '@/hooks/useLocation';
 import { usePlayerStore } from '@/stores/playerStore';
 import { savePhotos } from '@/utils/savePhotos';
+import { posthog } from '@/lib/posthog';
 
 const Classifier = VehicleClassifier ?? VehicleClassifierStub;
 
@@ -78,6 +79,7 @@ export default function Scan360Screen() {
 
   // Ready gate — unlock capture after READY_DELAY_MS
   useEffect(() => {
+    posthog.capture('scan_started', { type: '360' });
     const t = setTimeout(() => setIsReady(true), READY_DELAY_MS);
     return () => clearTimeout(t);
   }, []);
@@ -88,6 +90,11 @@ export default function Scan360Screen() {
     const anchorIndex = ANCHORS.indexOf(currentAnchor);
     const photo = await cameraRef.current?.takePhoto();
     if (photo) tempPhotos.current[anchorIndex] = photo.path;
+
+    posthog.capture('anchor_captured', {
+      anchor: currentAnchor,
+      index:  anchorIndex,
+    });
 
     // ── FRONT: classify as gate before advancing ──────────────────────────
     if (anchorIndex === 0) {
@@ -160,10 +167,19 @@ export default function Scan360Screen() {
       photoPath:     tempPhotos.current[0] ?? undefined,
     });
 
+    posthog.capture('catch_recorded', {
+      catch_type: 'scan360',
+      make:       result.make,
+      model:      result.model,
+      confidence: result.confidence,
+      fuzzy_city: fuzzyCity ?? null,
+    });
+
     router.back();
   }, [result, addCatch, fuzzyCity, fuzzyDistrict]);
 
   const handleRescan = useCallback(() => {
+    posthog.capture('scan_rescan_clicked', { type: '360' });
     setCaptured(new Set());
     setCurrentAnchor('FRONT');
     setResult(null);

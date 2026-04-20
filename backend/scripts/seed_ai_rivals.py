@@ -21,10 +21,10 @@ _ARCHETYPES = [
     ("GhostKing_{city}",   (8_000,  25_000), (8,  14)),
     ("RoadRacer_{city}",   (3_000,  12_000), (6,  11)),
     ("UrbanHunter_{city}", (15_000, 60_000), (12, 20)),
-    ("NightCruiser_{n}",   (1_500,   6_000), (4,   9)),
-    ("LocalLegend_{city}", (40_000, 120_000),(18, 25)),
-    ("Drifter_{n}",        (500,    3_000),  (2,   7)),
-    ("SpeedDemon_{n}",     (20_000, 80_000), (15, 22)),
+    ("NightCruiser_{city}_{n}", (1_500,   6_000), (4,   9)),
+    ("LocalLegend_{city}",     (40_000, 120_000),(18, 25)),
+    ("Drifter_{city}_{n}",     (500,    3_000),  (2,   7)),
+    ("SpeedDemon_{city}_{n}",  (20_000, 80_000), (15, 22)),
 ]
 
 _CITY_TAG = {

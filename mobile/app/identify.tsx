@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
 import { BadgeAwardModal } from '@/components/BadgeAwardModal';
+import { posthog } from '@/lib/posthog';
 
 type IdCard = {
   id: string;
@@ -46,7 +47,11 @@ export default function IdentifyScreen() {
 
   const { data: cards = [], isLoading, isError } = useQuery<IdCard[]>({
     queryKey: ['identify-queue'],
-    queryFn:  () => apiClient.get('/community/identify-queue?limit=10') as Promise<IdCard[]>,
+    queryFn: async () => {
+      const res = await apiClient.get('/community/identify-queue?limit=10') as IdCard[];
+      posthog.capture('identify_queue_loaded', { count: res.length });
+      return res;
+    },
     staleTime: 5 * 60 * 1000,
   });
 
@@ -59,6 +64,15 @@ export default function IdentifyScreen() {
     onSuccess(data, variables) {
       setResult({ ...data, guessed: variables.guess });
       setProfile(data.new_total_xp, data.new_level);
+      
+      const card = cards[cardIndex];
+      posthog.capture('identify_guess_submitted', {
+        card_id:   variables.cardId,
+        correct:   data.correct,
+        source:    card?.source,
+        xp_earned: data.xp_earned,
+        is_text:   card?.isTextEntry,
+      });
 
       if (data.badge_earned) {
         setEarnedBadge(data.badge_earned);

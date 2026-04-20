@@ -6,6 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCatchStore } from '@/stores/catchStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { posthog } from '@/lib/posthog';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -125,6 +126,11 @@ export default function SatelliteCatchScreen() {
     setPhase('locking');
     startRef.current = Date.now();
 
+    posthog.capture('satellite_lock_started', {
+      object_name: objectName,
+      rarity:      rarity,
+    });
+
     lockRef.current = Animated.timing(progress, {
       toValue:         1,
       duration:        LOCK_MS,
@@ -155,6 +161,12 @@ export default function SatelliteCatchScreen() {
     setPhase('caught');
     setCountdown(0);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    posthog.capture('satellite_caught', {
+      object_name: objectName,
+      rarity:      rarity,
+      object_type: params.objectType,
+    });
 
     addCatch({
       make:         'Space Object',

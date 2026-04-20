@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -10,9 +10,12 @@ import { posthog } from '@/lib/posthog';
 
 const queryClient = new QueryClient();
 
-function UserIdentifier() {
+function PostHogTracker() {
   const userId = usePlayerStore(s => s.userId);
   const username = usePlayerStore(s => s.username);
+  const pathname = usePathname();
+  const params = useLocalSearchParams();
+
   useEffect(() => {
     if (userId) {
       posthog.identify(userId, username ? { username } : {});
@@ -20,6 +23,11 @@ function UserIdentifier() {
       posthog.reset();
     }
   }, [userId, username]);
+
+  useEffect(() => {
+    posthog.screen(pathname, params);
+  }, [pathname, params]);
+
   return null;
 }
 
@@ -29,7 +37,7 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <UserIdentifier />
+            <PostHogTracker />
             <StatusBar style="light" />
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0a0a' } }}>
               <Stack.Screen name="(tabs)" />

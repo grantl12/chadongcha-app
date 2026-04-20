@@ -224,6 +224,7 @@ create table if not exists catchable_objects (
 );
 
 create index if not exists catchable_objects_pass_start_idx on catchable_objects(pass_start);
+alter table catchable_objects add constraint if not exists catchable_objects_space_object_pass_start_key unique (space_object_id, pass_start);
 
 -- Add FK from catches → catchable_objects
 do $$ begin

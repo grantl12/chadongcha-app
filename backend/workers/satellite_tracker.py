@@ -145,8 +145,10 @@ def _elevation_deg(
 # TLE fetch & DB upsert
 # ---------------------------------------------------------------------------
 
+_HEADERS = {"User-Agent": "chadongcha-sat-tracker/1.0 (grant.m.lindberg@googlemail.com)"}
+
 async def fetch_tles(url: str) -> list[tuple[str, str, str]]:
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, headers=_HEADERS) as client:
         resp = await client.get(url)
         resp.raise_for_status()
     lines = [ln.strip() for ln in resp.text.splitlines() if ln.strip()]

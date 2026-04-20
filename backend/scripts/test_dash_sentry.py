@@ -14,12 +14,14 @@ Optional flags:
     --api     Override API base URL (default: production)
     --keep    Don't delete the test catch row after the run
 """
+from __future__ import annotations
 import argparse
 import os
 import sys
 import json
 import urllib.request
 import urllib.error
+import urllib.parse
 from datetime import datetime, timezone
 
 # Load .env if present (no external deps beyond stdlib for the test harness itself)
@@ -62,15 +64,21 @@ def _supabase_get(path: str, params: dict | None = None) -> list[dict]:
     """Direct Supabase REST query using the service key."""
     url = f"{SUPABASE_URL}/rest/v1/{path}"
     if params:
-        qs = "&".join(f"{k}={v}" for k, v in params.items())
-        url = f"{url}?{qs}"
+        url = f"{url}?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers={
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Accept": "application/json",
     })
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        raise RuntimeError(f"HTTP {e.code} from Supabase ({path}): {body}") from e
+    if not isinstance(result, list):
+        raise RuntimeError(f"Unexpected Supabase response (expected list): {result}")
+    return result
 
 
 def _supabase_delete(table: str, catch_id: str) -> None:
@@ -100,7 +108,7 @@ def step_signin(api: str, email: str, password: str) -> tuple[str, str]:
 
 def step_get_generation() -> str:
     print("  → Supabase: SELECT id FROM generations LIMIT 1")
-    rows = _supabase_get("generations", {"select": "id,common_name", "limit": "1", "order": "created_at.asc"})
+    rows = _supabase_get("generations", {"select": "id,common_name", "limit": "1"})
     if not rows:
         raise RuntimeError("No generations in DB — seed data may be missing")
     gen = rows[0]

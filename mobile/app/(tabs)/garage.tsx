@@ -10,6 +10,7 @@ import { useCatchStore, type CatchRecord } from '@/stores/catchStore';
 import { usePlayerStore, type StoredBoost, MAX_STORED_BOOSTS } from '@/stores/playerStore';
 import { useMarketStore, type MarketListing } from '@/stores/marketStore';
 import { GarageCarousel } from '@/components/GarageCarousel';
+import { HexBadge } from '@/components/HexBadge';
 import { computeBadges, type Badge, type BadgeCategory } from '@/utils/badges';
 import { PaywallModal } from '@/components/PaywallModal';
 
@@ -137,16 +138,9 @@ const BadgeCard = memo(function BadgeCard({ badge }: { badge: Badge }) {
     : badge.earned ? 1 : 0;
 
   return (
-    <Pressable
-      style={[
-        styles.badgeCard,
-        { borderColor: badge.earned ? badge.color + 'aa' : '#222' },
-        !badge.earned && styles.badgeCardLocked,
-      ]}
-      onPress={() => setExpanded(e => !e)}
-    >
-      <Text style={[styles.badgeIcon, !badge.earned && styles.badgeLocked]}>{badge.icon}</Text>
-      <Text style={[styles.badgeName, { color: badge.earned ? '#fff' : '#555' }]} numberOfLines={1}>
+    <Pressable style={styles.badgeCard} onPress={() => setExpanded(e => !e)}>
+      <HexBadge badge={badge} size={76}/>
+      <Text style={[styles.badgeName, { color: badge.earned ? '#f0ead8' : '#444' }]} numberOfLines={1}>
         {badge.name}
       </Text>
       {badge.progress && !badge.earned && (
@@ -157,9 +151,6 @@ const BadgeCard = memo(function BadgeCard({ badge }: { badge: Badge }) {
       {badge.progress && !badge.earned && (
         <Text style={styles.progressText}>{badge.progress.current}/{badge.progress.total}</Text>
       )}
-      {badge.earned && (
-        <View style={[styles.earnedDot, { backgroundColor: badge.color }]} />
-      )}
       {expanded && (
         <Text style={styles.badgeDesc}>{badge.description}</Text>
       )}
@@ -167,11 +158,28 @@ const BadgeCard = memo(function BadgeCard({ badge }: { badge: Badge }) {
   );
 });
 
+const CAT_COLORS: Record<BadgeCategory | 'all', string> = {
+  all:        '#888',
+  enthusiast: '#f59e0b',
+  style:      '#6366f1',
+  rarity:     '#e63946',
+  decade:     '#22d3ee',
+  grind:      '#f97316',
+  social:     '#22c55e',
+  collection: '#a855f7',
+};
+
 // ─── Collection Tab ───────────────────────────────────────────────────────────
 
 function CollectionTab({ badges }: { badges: Badge[] }) {
+  const [activeCat, setActiveCat] = useState<BadgeCategory | 'all'>('all');
   const earned = useMemo(() => badges.filter(b => b.earned).length, [badges]);
-  const categories = ['enthusiast', 'grind', 'rarity', 'style', 'decade', 'social', 'collection'] as BadgeCategory[];
+  const categories: (BadgeCategory | 'all')[] = ['all', 'enthusiast', 'grind', 'rarity', 'style', 'decade', 'social'];
+
+  const filtered = useMemo(() => {
+    const list = activeCat === 'all' ? badges : badges.filter(b => b.category === activeCat);
+    return [...list].sort((a, b) => (b.earned ? 1 : 0) - (a.earned ? 1 : 0));
+  }, [badges, activeCat]);
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.collectionContainer} showsVerticalScrollIndicator={false}>
@@ -183,7 +191,7 @@ function CollectionTab({ badges }: { badges: Badge[] }) {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statBlock}>
-          <Text style={styles.statNum}>{badges.length}</Text>
+          <Text style={[styles.statNum, { color: '#f59e0b' }]}>{badges.length}</Text>
           <Text style={styles.statLabel}>TOTAL</Text>
         </View>
         <View style={styles.statDivider} />
@@ -193,27 +201,32 @@ function CollectionTab({ badges }: { badges: Badge[] }) {
         </View>
       </View>
 
-      {/* Progress bar */}
+      {/* Master progress bar */}
       <View style={styles.masterProgress}>
         <View style={[styles.masterFill, { width: `${(earned / badges.length) * 100}%` as any }]} />
       </View>
 
-      {/* Badge sections by category */}
-      {categories.map(cat => {
-        const catBadges = badges.filter(b => b.category === cat);
-        const catEarned = catBadges.filter(b => b.earned).length;
-        return (
-          <View key={cat} style={styles.badgeSection}>
-            <View style={styles.badgeSectionHeader}>
-              <Text style={styles.badgeSectionTitle}>{CATEGORY_LABEL[cat]}</Text>
-              <Text style={styles.badgeSectionCount}>{catEarned}/{catBadges.length}</Text>
-            </View>
-            <View style={styles.badgeGrid}>
-              {catBadges.map(b => <BadgeCard key={b.id} badge={b} />)}
-            </View>
-          </View>
-        );
-      })}
+      {/* Category filter tabs */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catTabsScroll} contentContainerStyle={styles.catTabsRow}>
+        {categories.map(cat => {
+          const on = activeCat === cat;
+          const count = cat === 'all' ? badges.length : badges.filter(b => b.category === cat).length;
+          const color = CAT_COLORS[cat];
+          return (
+            <Pressable key={cat} style={[styles.catTab, on && { borderBottomColor: color, borderBottomWidth: 2 }]} onPress={() => setActiveCat(cat)}>
+              <Text style={[styles.catTabText, { color: on ? color : '#555' }]}>
+                {cat === 'all' ? 'ALL' : CATEGORY_LABEL[cat as BadgeCategory]}
+              </Text>
+              <Text style={[styles.catTabCount, { color: on ? color : '#333' }]}>{count}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {/* Badge grid */}
+      <View style={styles.badgeGrid}>
+        {filtered.map(b => <BadgeCard key={b.id} badge={b} />)}
+      </View>
     </ScrollView>
   );
 }
@@ -1087,21 +1100,18 @@ const styles = StyleSheet.create({
   statDivider:         { width: 1, height: 36, backgroundColor: '#222' },
   masterProgress:      { height: 4, backgroundColor: '#1a1a1a', borderRadius: 2, marginBottom: 24, overflow: 'hidden' },
   masterFill:          { height: '100%', backgroundColor: '#fff', borderRadius: 2 },
-  badgeSection:        { marginBottom: 28 },
-  badgeSectionHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  badgeSectionTitle:   { color: '#777', fontSize: 11, fontWeight: '800', letterSpacing: 2 },
-  badgeSectionCount:   { color: '#444', fontSize: 11, fontWeight: '700' },
-  badgeGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  badgeCard:           { width: '30%', borderRadius: 10, borderWidth: 1, padding: 10, alignItems: 'center', gap: 6, backgroundColor: '#111' },
-  badgeCardLocked:     { opacity: 0.55 },
-  badgeIcon:           { fontSize: 28 },
-  badgeLocked:         { opacity: 0.4 },
-  badgeName:           { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center' },
-  badgeDesc:           { fontSize: 9, color: '#666', textAlign: 'center', marginTop: 2 },
-  progressBar:         { width: '100%', height: 3, backgroundColor: '#222', borderRadius: 2, overflow: 'hidden' },
+  catTabsScroll:       { marginBottom: 16, marginHorizontal: -16 },
+  catTabsRow:          { paddingHorizontal: 16, gap: 4 },
+  catTab:              { paddingVertical: 8, paddingHorizontal: 10, borderBottomColor: 'transparent', borderBottomWidth: 2 },
+  catTabText:          { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
+  catTabCount:         { fontSize: 9, fontWeight: '700', textAlign: 'center', marginTop: 2 },
+  badgeGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' },
+  badgeCard:           { width: '30%', alignItems: 'center', gap: 6, paddingVertical: 8 },
+  badgeName:           { fontSize: 9, fontWeight: '700', letterSpacing: 0.3, textAlign: 'center', maxWidth: 76 },
+  badgeDesc:           { fontSize: 9, color: '#555', textAlign: 'center', marginTop: 2 },
+  progressBar:         { width: '90%', height: 3, backgroundColor: '#222', borderRadius: 2, overflow: 'hidden' },
   progressFill:        { height: '100%', borderRadius: 2 },
-  progressText:        { color: '#555', fontSize: 9, fontWeight: '700' },
-  earnedDot:           { width: 6, height: 6, borderRadius: 3 },
+  progressText:        { color: '#444', fontSize: 9, fontWeight: '700' },
 
   // Market tab
   marketNav:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },

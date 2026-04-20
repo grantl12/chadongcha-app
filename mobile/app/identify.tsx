@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
 import { BadgeAwardModal } from '@/components/BadgeAwardModal';
+import { getBadgeById, type Badge } from '@/utils/badges';
 import { posthog } from '@/lib/posthog';
 
 type IdCard = {
@@ -42,7 +43,7 @@ export default function IdentifyScreen() {
   const [cardIndex, setCardIndex]   = useState(0);
   const [guessText, setGuessText]   = useState('');
   const [result, setResult]         = useState<GuessResult & { guessed: string } | null>(null);
-  const [earnedBadge, setEarnedBadge] = useState<{ type: string, label: string } | null>(null);
+  const [earnedBadge, setEarnedBadge] = useState<Badge | null>(null);
   const inputRef = useRef<TextInput>(null);
 
   const { data: cards = [], isLoading, isError } = useQuery<IdCard[]>({
@@ -75,7 +76,8 @@ export default function IdentifyScreen() {
       });
 
       if (data.badge_earned) {
-        setEarnedBadge(data.badge_earned);
+        const full = getBadgeById(data.badge_earned.type);
+        if (full) setEarnedBadge(full);
       }
 
       if (data.correct) {

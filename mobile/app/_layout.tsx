@@ -15,7 +15,7 @@ function UserIdentifier() {
   const username = usePlayerStore(s => s.username);
   useEffect(() => {
     if (userId) {
-      posthog.identify(userId, { username: username ?? undefined });
+      posthog.identify(userId, username ? { username } : {});
     } else {
       posthog.reset();
     }

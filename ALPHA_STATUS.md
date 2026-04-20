@@ -31,17 +31,21 @@ establish a fresh Supabase session. Then go scan something. You should see it wr
 
 ## CI / Build Status
 
-**CI is working fine.** Previous "canceled" builds were canceled by the workflow's
-cancel-pending job (by design — cancels stale builds when a new push lands). Not a CI bug.
+**Android:** FINISHED ✅ — APK at `https://expo.dev/artifacts/eas/a7eFXNWrqns5hG7MEMxyja.apk`
 
-**Current builds in progress (both from commit `12c84e2`):**
-- Android APK: `45ecf201` — IN_PROGRESS as of 2026-04-20
-- iOS IPA: `d0b8e0f8` — NEW/queued as of 2026-04-20
+**iOS:** Fixed and rebuilding. Root cause was stale provisioning profiles that predated
+the Sign in with Apple capability being added (`usesAppleSignIn: true` was in the config
+but the cached profile didn't have `com.apple.developer.applesignin`). Both old profiles
+(AD_HOC and APP_STORE) were deleted from EAS via GraphQL API on 2026-04-20. On the next
+build, EAS auto-creates new profiles with all current entitlements.
 
-Check expo.dev → chadongcha project for build completion and download links.
-
-**To install on device:** Download the APK (Android) or use TestFlight (iOS) once
-the builds complete.
+If the next iOS build fails with "Provisioning profile not configured correctly — run in
+interactive mode", you need to run this once in your terminal:
+```
+cd mobile
+eas credentials:configure-build --platform ios --profile preview
+```
+Follow the prompts to regenerate the Ad Hoc profile. After that, CI will work unattended.
 
 ---
 

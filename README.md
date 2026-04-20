@@ -283,7 +283,8 @@ python ml/eval_id_game.py --conf-threshold 0.6 --top-k 3
 |----------|-------|
 | `SUPABASE_URL` | backend + mobile |
 | `SUPABASE_ANON_KEY` | mobile (public) |
-| `SUPABASE_SERVICE_KEY` | backend only — bypasses RLS |
+| `SUPABASE_SERVICE_KEY` | backend only — legacy name, still read as fallback |
+| `SUPABASE_SERVICE_ROLE_KEY` | backend only — preferred, bypasses RLS for workers/seeders |
 | `MAPBOX_PUBLIC_TOKEN` | mobile runtime |
 | `MAPBOX_DOWNLOADS_TOKEN` | Android Gradle build — EAS secret |
 | `R2_ACCOUNT_ID` | backend only |
@@ -314,7 +315,7 @@ npx expo start
 
 ---
 
-## Alpha Status (April 2026)
+## Status (April 20, 2026)
 
 | Component | Status |
 |-----------|--------|
@@ -335,12 +336,20 @@ npx expo start
 | Privacy blur (OpenCV, Haar cascades, faces + plates) | ✅ |
 | Content moderation (Google Vision SafeSearch, async) | ✅ |
 | Community ID (3-vote auto-confirm, retroactive XP) | ✅ |
+| Ghost class pipeline (unknown vehicles → community votes → promotion_ready → next training run) | ✅ |
 | Contribute photos fix (permanent path priority) | ✅ |
 | iOS CoreML classifier | ✅ |
 | Android TFLite classifier | ✅ (wired via Expo Modules) |
 | ML eval script (ONNX, R2 id_game images, accuracy report) | ✅ |
+| SAM optimizer + --freeze-backbone incremental class addition | ✅ |
+| PostHog analytics — 20 events across mobile + backend, identify with username + provider | ✅ |
+| Road King territory — AI ghost rivals seeded at launch | ✅ Carrollton / Atlanta / Johnson City TN |
+| Satellite passes — 10k TLEs → SGP4 → 25,910 catchable_objects live | ✅ |
+| Sat-worker batched upserts (500/req, Railway Cron safe) | ✅ |
+| scripts/check.sh — local CI mirror (ruff + mypy + tsc) | ✅ |
 | Full model retrain with current class list + rear images | 🔧 blocked on scraper |
 | Image scraper (ddgs rate limiting — needs workaround) | 🔧 blocked |
+| Onboarding tutorial / scripted walkthrough | 🔧 backlog (~3–4 days) |
 | TestFlight + Play Store internal track | 🔧 soon |
 
 ---

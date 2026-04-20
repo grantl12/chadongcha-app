@@ -18,7 +18,7 @@ app = FastAPI(title="Chadongcha API", version="0.1.0")
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    ph.capture(
+    ph.capture(  # type: ignore[misc]
         "backend_error",
         "exception",
         properties={

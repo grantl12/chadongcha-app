@@ -58,7 +58,7 @@ async def signup(request: Request, body: SignUpRequest):
     # Immediately issue a session so the mobile client can skip the sign-in step.
     try:
         signin = db.auth.sign_in_with_password({"email": body.email, "password": body.password})
-        ph.capture(user_id, "signup_success", properties={"provider": "email"})
+        ph.capture(user_id, "signup_success", properties={"provider": "email"})  # type: ignore[misc]
         if signin.session is None:
             return {"user_id": user_id}
         return {
@@ -83,7 +83,7 @@ async def signin(request: Request, body: SignInRequest):
     if not result.session or not result.user:
         raise HTTPException(status_code=401, detail="Sign in failed")
 
-    ph.capture(result.user.id, "signin_success", properties={"provider": "email"})
+    ph.capture(result.user.id, "signin_success", properties={"provider": "email"})  # type: ignore[misc]
     return {
         "access_token": result.session.access_token,
         "refresh_token": result.session.refresh_token,
@@ -151,7 +151,7 @@ async def upsert_profile(request: Request, body: UpsertProfileRequest, authoriza
             "username": body.username,
             "credits":  100,
         }, on_conflict="id").execute()
-        ph.capture(user_id, "profile_upsert_success", properties={"username": body.username})
+        ph.capture(user_id, "profile_upsert_success", properties={"username": body.username})  # type: ignore[misc]
     except Exception as e:
         if "username" in str(e).lower():
             raise HTTPException(status_code=409, detail="Username already taken")

@@ -199,6 +199,11 @@ export const useCatchStore = create<CatchStore>()(
                   : c,
               ),
             }));
+            posthog.capture('catch_synced', {
+              catch_type: catch_.catchType,
+              xp_earned:  res.xp_earned,
+              duplicate:  res.duplicate,
+            });
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Sync failed';
             set({ syncError: msg });

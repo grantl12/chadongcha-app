@@ -6,19 +6,25 @@ Responsibilities:
 2. Every 10 minutes: compute overhead passes for active player locations
 3. Insert upcoming passes into catchable_objects table
 4. Fire Expo push notification 5 minutes before pass_start
+
+Usage:
+  python satellite_tracker.py          # continuous background worker (default)
+  python satellite_tracker.py --once   # run one full cycle and exit (for Railway Cron)
 """
 import asyncio
 import logging
 import math
+import sys
 from datetime import datetime, timezone, timedelta
+
+# Configure logging before any imports that could fail, so startup errors are visible.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger(__name__)
 
 import httpx
 from sgp4.api import Satrec, jday
 
 from db import get_client
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger(__name__)
 
 # Celestrak TLE group endpoints (GP data API — /NORAD/elements/gp.php)
 # Note: the old /SPACETRACK/query/class/gp/ path returns 404 as of 2024.
@@ -390,11 +396,12 @@ async def fire_notifications() -> None:
 # Main loop
 # ---------------------------------------------------------------------------
 
-async def main() -> None:
-    log.info("Satellite tracker starting")
+async def main(once: bool = False) -> None:
+    log.info("Satellite tracker starting (mode=%s)", "once" if once else "continuous")
     tle_interval  = 6 * 3600   # 6 hours
     pass_interval = 600         # 10 minutes
-    last_tle = 0.0
+    # Force TLE refresh on the very first iteration regardless of elapsed time.
+    last_tle = -tle_interval
 
     while True:
         loop_time = asyncio.get_event_loop().time()
@@ -405,8 +412,13 @@ async def main() -> None:
 
         await compute_passes()
         await fire_notifications()
+
+        if once:
+            log.info("--once mode: exiting after first cycle")
+            return
+
         await asyncio.sleep(pass_interval)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(once="--once" in sys.argv))

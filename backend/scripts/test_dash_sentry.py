@@ -96,7 +96,7 @@ def step_signin(api: str, email: str, password: str) -> tuple[str, str]:
 
 
 def step_get_generation() -> str:
-    print(f"  → Supabase: SELECT id FROM generations LIMIT 1")
+    print("  → Supabase: SELECT id FROM generations LIMIT 1")
     rows = _supabase_get("generations", {"select": "id,common_name", "limit": "1", "order": "created_at.asc"})
     if not rows:
         raise RuntimeError("No generations in DB — seed data may be missing")
@@ -136,7 +136,7 @@ def step_verify_db(catch_id: str, player_id: str) -> dict:
     if not rows:
         raise RuntimeError(f"Catch {catch_id} NOT found in DB — sync failed!")
     row = rows[0]
-    print(f"  ✓ Row confirmed in DB:")
+    print("  ✓ Row confirmed in DB:")
     print(f"      id          = {row['id']}")
     print(f"      catch_type  = {row['catch_type']}")
     print(f"      color       = {row['color']}")
@@ -149,7 +149,7 @@ def step_verify_db(catch_id: str, player_id: str) -> dict:
 def step_cleanup(catch_id: str) -> None:
     print(f"  → Deleting test catch {catch_id[:8]}… from DB")
     _supabase_delete("catches", catch_id)
-    print(f"  ✓ Cleaned up")
+    print("  ✓ Cleaned up")
 
 
 # ---------------------------------------------------------------------------

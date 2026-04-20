@@ -34,7 +34,13 @@
       "Bash(powershell *)",
       "Bash(python *)",
       "Bash(/c/Windows/System32/cmd.exe *)",
-      "Bash(\"D:/Users/grant/Documents/ChaDongCha/ml/.venv310/Scripts/python.exe\" training/scrape_images.py)"
+      "Bash(\"D:/Users/grant/Documents/ChaDongCha/ml/.venv310/Scripts/python.exe\" training/scrape_images.py)",
+      "Bash(ml/.venv310/Scripts/python.exe ml/training/bootstrap.py --phase classify --epochs 100 --patience 10)",
+      "Bash(find \"D:/Users/grant/Documents/ChaDongCha/ml/data/images\" -mindepth 1 -maxdepth 1 -type d -exec basename {} \\\\;)",
+      "Bash(taskkill /F /FI \"WINDOWTITLE eq *bootstrap*\")",
+      "Bash(gh run *)",
+      "Bash(pip install *)",
+      "Bash(ruff check *)"
     ]
   }
 }

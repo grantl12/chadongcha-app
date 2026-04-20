@@ -33,3 +33,4 @@ ml/data/images.zip
 # Misc
 .DS_Store
 *.log
+local.properties

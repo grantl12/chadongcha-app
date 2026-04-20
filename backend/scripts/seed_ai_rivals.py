@@ -54,7 +54,7 @@ def _ensure_ghost_players(db, city: str) -> list[dict]:
             "username": username,
             "xp": xp,
             "level": level,
-            "is_ai_rival": True, # Note: schema says is_ai_rival, script said is_ai earlier. Fixed to match schema.
+            "is_ai_rival": True,
             "home_city": city,
         }, on_conflict="id").execute()
 

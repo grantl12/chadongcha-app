@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { useLocation } from '@/hooks/useLocation';
 import { useCatchStore } from '@/stores/catchStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { posthog } from '@/lib/posthog';
 import { useSettingsStore } from '@/stores/settingsStore';
 import {
   VehicleClassifier,
@@ -190,6 +191,14 @@ export default function DashSentry() {
       catchType: 'highway',
       fuzzyCity:     fuzzyCity     ?? undefined,
       fuzzyDistrict: fuzzyDistrict ?? undefined,
+    });
+    posthog.capture('catch_recorded', {
+      catch_type:  'highway',
+      make:        result.make,
+      model:       result.model,
+      confidence:  result.confidence,
+      fuzzy_city:  fuzzyCity ?? null,
+      scan_boost:  scanBoostActive,
     });
     showBanner(`CAUGHT: ${result.make} ${result.model} · ${Math.round(result.confidence * 100)}%`);
     setCatchFlash('catch');

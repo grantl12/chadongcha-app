@@ -6,6 +6,7 @@ import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { uploadPhoto } from '@/utils/uploadPhoto';
+import { posthog } from '@/lib/posthog';
 
 export type CatchRecord = {
   id: string;
@@ -199,11 +200,14 @@ export const useCatchStore = create<CatchStore>()(
               ),
             }));
           } catch (err: unknown) {
-            // Network unavailable or server error — will retry on next foreground.
-            // Persist the last error message so the UI can surface it.
             const msg = err instanceof Error ? err.message : 'Sync failed';
             set({ syncError: msg });
-            break; // stop processing further pending catches this cycle
+            posthog.capture('sync_failed', {
+              error:      msg,
+              catch_type: catch_.catchType,
+              pending:    get().catches.filter(c => !c.synced).length,
+            });
+            break;
           }
         }
       },

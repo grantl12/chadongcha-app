@@ -39,7 +39,9 @@
     "react-native-vision-camera": "4.6.4",
     "three": "^0.183.2",
     "vehicle-classifier": "file:./modules/vehicle-classifier",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "posthog-react-native": "^3.3.7",
+    "expo-application": "~6.0.2"
   },
   "expo": {
     "doctor": {

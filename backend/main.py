@@ -1,13 +1,35 @@
-from fastapi import FastAPI
+import traceback
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+import posthog as ph
 
 from config import settings
 from routers import auth, catches, vehicles, leaderboard, model_update, satellites, territory, players, market, uploads, community, shop, feed, boosts, crews
 
+ph.project_api_key = "phc_AF7zruUuPR2rA5g6t4p58uWNqEth9qhVCL8jik2h84Sa"
+ph.host = "https://us.i.posthog.com"
+
 app = FastAPI(title="Chadongcha API", version="0.1.0")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    ph.capture(
+        "backend_error",
+        "exception",
+        {
+            "error":     type(exc).__name__,
+            "message":   str(exc),
+            "path":      str(request.url.path),
+            "method":    request.method,
+            "traceback": traceback.format_exc(),
+        },
+    )
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 # Rate limiting (in-memory; no Redis required)
 app.state.limiter = auth._limiter

@@ -13,3 +13,4 @@ bcrypt==4.2.0
 boto3==1.35.36
 opencv-python-headless==4.10.0.84
 slowapi==0.1.9
+posthog>=3.5.0

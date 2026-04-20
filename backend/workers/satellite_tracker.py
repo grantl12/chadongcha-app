@@ -21,10 +21,10 @@ from datetime import datetime, timezone, timedelta
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-import httpx
-from sgp4.api import Satrec, jday
+import httpx  # noqa: E402
+from sgp4.api import Satrec, jday  # noqa: E402
 
-from db import get_client
+from db import get_client  # noqa: E402
 
 # Celestrak TLE group endpoints (GP data API — /NORAD/elements/gp.php)
 # Note: the old /SPACETRACK/query/class/gp/ path returns 404 as of 2024.

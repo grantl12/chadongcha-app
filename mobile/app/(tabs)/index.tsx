@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '@/api/client';
 import { useLocation } from '@/hooks/useLocation';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useCatchStore } from '@/stores/catchStore';
 import { BoostDecisionModal } from '@/components/BoostDecisionModal';
 
 type CatchableObject = {
@@ -115,6 +116,9 @@ function OrbitalBoostBanner({ expires }: { expires: string | null }) {
 export default function OperationsScreen() {
   const { latitude, longitude } = useLocation();
   const orbitalBoostExpires     = usePlayerStore(s => s.orbitalBoostExpires);
+  const syncError               = useCatchStore(s => s.syncError);
+  const clearSyncError          = useCatchStore(s => s.clearSyncError);
+  const pendingCount            = useCatchStore(s => s.catches.filter(c => !c.synced).length);
   const [caught, setCaught]     = useState<Set<string>>(new Set());
 
   const satQuery = useQuery({
@@ -148,6 +152,15 @@ export default function OperationsScreen() {
   return (
     <View style={styles.container}>
       <OrbitalBoostBanner expires={orbitalBoostExpires} />
+
+      {syncError && (
+        <Pressable style={styles.syncErrorBanner} onPress={clearSyncError}>
+          <Text style={styles.syncErrorText}>
+            SYNC FAILED{pendingCount > 0 ? ` · ${pendingCount} pending` : ''} — tap to dismiss
+          </Text>
+          <Text style={styles.syncErrorDetail} numberOfLines={1}>{syncError}</Text>
+        </Pressable>
+      )}
 
       {/* Mode entry buttons */}
       <View style={styles.modeSection}>
@@ -217,6 +230,10 @@ export default function OperationsScreen() {
 
 const styles = StyleSheet.create({
   container:        { flex: 1, backgroundColor: '#0a0a0a', padding: 24, paddingTop: 70 },
+
+  syncErrorBanner:  { backgroundColor: '#1a0000', borderWidth: 1, borderColor: '#e6394644', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 12 },
+  syncErrorText:    { color: '#e63946', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  syncErrorDetail:  { color: '#e6394688', fontSize: 10, marginTop: 2 },
 
   boostBanner:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 20 },
   boostIcon:        { fontSize: 20 },

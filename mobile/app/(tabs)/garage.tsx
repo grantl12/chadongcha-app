@@ -778,37 +778,7 @@ export default function GarageScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Sync error banner */}
-      {syncError && (
-        <Pressable style={styles.syncErrorBanner} onPress={clearError}>
-          <Text style={styles.syncErrorText}>⚠ Sync failed — catches will retry when online</Text>
-          <Text style={styles.syncErrorDismiss}>✕</Text>
-        </Pressable>
-      )}
-
-      {/* Pending sync indicator */}
-      {!syncError && pendingCount > 0 && (
-        <View style={styles.syncPendingBanner}>
-          <ActivityIndicator size="small" color="#555" style={{ marginRight: 8 }} />
-          <Text style={styles.syncPendingText}>Syncing {pendingCount} catch{pendingCount > 1 ? 'es' : ''}…</Text>
-        </View>
-      )}
-
-      {/* Garage cap banner */}
-      {garageFull && (
-        <Pressable style={styles.garageCap} onPress={() => setPaywallVisible(true)}>
-          <Text style={styles.garageCapText}>GARAGE FULL · {catches.length}/{FREE_GARAGE_LIMIT} · UPGRADE TO PRO →</Text>
-        </Pressable>
-      )}
-      {!isSubscriber && !garageFull && catches.length >= FREE_GARAGE_LIMIT - 10 && (
-        <Pressable style={styles.garageCapWarn} onPress={() => setPaywallVisible(true)}>
-          <Text style={styles.garageCapWarnText}>
-            {FREE_GARAGE_LIMIT - catches.length} garage slots remaining · Upgrade for unlimited
-          </Text>
-        </Pressable>
-      )}
-
-      {/* Header */}
+      {/* Header — paddingTop clears the status bar */}
       <View style={styles.header}>
         <Text style={styles.title}>GARAGE</Text>
         <View style={styles.headerMeta}>
@@ -820,6 +790,36 @@ export default function GarageScreen() {
           <Text style={styles.metaDivider}>·</Text>
           <Text style={styles.metaLabel}>{credits.toLocaleString()} CR</Text>
         </View>
+
+        {/* Sync error banner — inside header so it's below the safe area */}
+        {syncError && (
+          <Pressable style={styles.syncErrorBanner} onPress={clearError}>
+            <Text style={styles.syncErrorText}>⚠ Sync failed — catches will retry when online</Text>
+            <Text style={styles.syncErrorDismiss}>✕</Text>
+          </Pressable>
+        )}
+
+        {/* Pending sync indicator */}
+        {!syncError && pendingCount > 0 && (
+          <View style={styles.syncPendingBanner}>
+            <ActivityIndicator size="small" color="#555" style={{ marginRight: 8 }} />
+            <Text style={styles.syncPendingText}>Syncing {pendingCount} catch{pendingCount > 1 ? 'es' : ''}…</Text>
+          </View>
+        )}
+
+        {/* Garage cap banner */}
+        {garageFull && (
+          <Pressable style={styles.garageCap} onPress={() => setPaywallVisible(true)}>
+            <Text style={styles.garageCapText}>GARAGE FULL · {catches.length}/{FREE_GARAGE_LIMIT} · UPGRADE TO PRO →</Text>
+          </Pressable>
+        )}
+        {!isSubscriber && !garageFull && catches.length >= FREE_GARAGE_LIMIT - 10 && (
+          <Pressable style={styles.garageCapWarn} onPress={() => setPaywallVisible(true)}>
+            <Text style={styles.garageCapWarnText}>
+              {FREE_GARAGE_LIMIT - catches.length} garage slots remaining · Upgrade for unlimited
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Top tab bar */}
@@ -1013,14 +1013,14 @@ export default function GarageScreen() {
 
 const styles = StyleSheet.create({
   container:          { flex: 1, backgroundColor: '#0a0a0a' },
-  garageCap:          { backgroundColor: '#e63946', paddingVertical: 8, paddingHorizontal: 16, alignItems: 'center' },
+  garageCap:          { backgroundColor: '#e63946', paddingVertical: 8, paddingHorizontal: 16, marginTop: 8, borderRadius: 8, alignItems: 'center' },
   garageCapText:      { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  garageCapWarn:      { backgroundColor: '#1a0a0a', paddingVertical: 6, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e6394622' },
+  garageCapWarn:      { backgroundColor: '#1a0a0a', paddingVertical: 6, paddingHorizontal: 16, marginTop: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#e6394622' },
   garageCapWarnText:  { color: '#e63946aa', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  syncErrorBanner:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2a0a0a', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e6394633' },
+  syncErrorBanner:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2a0a0a', paddingHorizontal: 16, paddingVertical: 10, marginTop: 8, borderRadius: 8, borderWidth: 1, borderColor: '#e6394633' },
   syncErrorText:      { color: '#e63946', fontSize: 12, fontWeight: '700', flex: 1 },
   syncErrorDismiss:   { color: '#e63946', fontSize: 14, marginLeft: 12 },
-  syncPendingBanner:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#141414', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  syncPendingBanner:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#141414', paddingHorizontal: 16, paddingVertical: 8, marginTop: 8, borderRadius: 8 },
   syncPendingText:    { color: '#444', fontSize: 12 },
 
   // Header

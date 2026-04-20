@@ -176,9 +176,12 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
       if (mode === 'signup') {
         if (!username) { setError('Username is required.'); setLoading(false); return; }
         const res = await apiClient.post('/auth/signup', { email, password, username }) as {
-          user_id: string; access_token?: string;
+          user_id: string; access_token?: string; refresh_token?: string;
         };
         if (res.access_token) {
+          if (res.refresh_token) {
+            await supabase.auth.setSession({ access_token: res.access_token, refresh_token: res.refresh_token });
+          }
           setPlayer({ userId: res.user_id, username, accessToken: res.access_token });
           onSuccess();
           return;
@@ -190,8 +193,9 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
       }
 
       const res = await apiClient.post('/auth/signin', { email, password }) as {
-        access_token: string; user_id: string;
+        access_token: string; refresh_token: string; user_id: string;
       };
+      await supabase.auth.setSession({ access_token: res.access_token, refresh_token: res.refresh_token });
       setPlayer({ userId: res.user_id, username: email.split('@')[0], accessToken: res.access_token });
       try {
         const profile = await apiClient.get('/auth/me') as { username: string; xp: number; level: number };

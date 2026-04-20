@@ -14,7 +14,11 @@ Usage:
 
 import argparse
 import json
+import sys
+import time
 from pathlib import Path
+
+sys.stdout.reconfigure(line_buffering=True)  # type: ignore[union-attr]
 
 _BASE      = Path(__file__).parent.parent
 DATA_DIR   = _BASE / "data" / "images"
@@ -182,6 +186,10 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
             else "cpu"
         )
         print(f"Device: {device}")
+        if device == "cpu":
+            print("ERROR: No GPU available (DirectML, CUDA, or MPS). Refusing to train on CPU.")
+            print("Ensure torch-directml is installed and the AMD GPU is accessible, then retry.")
+            return
 
     # ImageNet normalization constants
     MEAN = [0.485, 0.456, 0.406]
@@ -218,11 +226,11 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
 
     train_loader = DataLoader(
         Subset(train_ds, train_idx),
-        batch_size=32, shuffle=True, num_workers=n_workers, pin_memory=pin,
+        batch_size=64, shuffle=True, num_workers=n_workers, pin_memory=pin,
     )
     val_loader = DataLoader(
         Subset(val_ds, val_idx),
-        batch_size=32, shuffle=False, num_workers=n_workers, pin_memory=pin,
+        batch_size=64, shuffle=False, num_workers=n_workers, pin_memory=pin,
     )
 
     n_classes = len(train_ds.classes)
@@ -248,8 +256,9 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
 
     model = model.to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-    # T_max covers the full remaining run so LR anneals smoothly to the end
+    # SGD+momentum uses only basic multiply/add ops — fully supported on DirectML.
+    # AdamW's lerp_ (momentum EMA) is not supported and falls back to CPU.
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4, nesterov=True)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
@@ -257,6 +266,7 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
     total_epochs = start_epoch - 1 + epochs
 
     for epoch in range(start_epoch, total_epochs + 1):
+        t0 = time.time()
         # ---- train ----
         model.train()
         running_loss = 0.0
@@ -288,8 +298,9 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
         else:
             epochs_no_improve += 1
 
-        marker = f"  ✓ best" if improved else f"  (no improvement {epochs_no_improve}/{patience})"
-        print(f"Epoch {epoch:3d}/{total_epochs}  loss={avg_loss:.4f}  val_acc={val_acc:.3f}{marker}")
+        elapsed = time.time() - t0
+        marker = "  * best" if improved else f"  (no improvement {epochs_no_improve}/{patience})"
+        print(f"Epoch {epoch:3d}/{total_epochs}  loss={avg_loss:.4f}  val_acc={val_acc:.3f}  {elapsed:.0f}s{marker}")
 
         if improved:
             best_acc = val_acc
@@ -306,12 +317,10 @@ def phase_classify(epochs: int, resume: bool = False, patience: int = 10):
             )
 
         if epochs_no_improve >= patience:
-            print(f"
-Early stopping — val_acc has not improved for {patience} consecutive epochs.")
+            print(f"\nEarly stopping — val_acc has not improved for {patience} consecutive epochs.")
             break
 
-    print(f"
-Training complete.  Best val acc: {best_acc:.3f}")
+    print(f"\nTraining complete.  Best val acc: {best_acc:.3f}")
     print(f"Checkpoint: {MODELS_DIR / 'best.pt'}")
     print(f"To keep training: python training/bootstrap.py --phase classify --epochs N --resume")
 
@@ -369,8 +378,7 @@ def phase_export():
     # ------------------------------------------------------------------
     try:
         import coremltools as ct
-        print("
-Exporting to CoreML…")
+        print("\nExporting to CoreML…")
         traced = torch.jit.trace(model, dummy)
         coreml_model = ct.convert(
             traced,
@@ -395,14 +403,12 @@ Exporting to CoreML…")
         coreml_model.save(str(coreml_path))
         print(f"CoreML saved → {coreml_path}")
     except (ImportError, RuntimeError, Exception) as e:
-        print(f"
-Skipping CoreML export (not supported on this platform: {e})")
+        print(f"\nSkipping CoreML export (not supported on this platform: {e})")
 
     # ------------------------------------------------------------------
     # ONNX (TFLite conversion path — run onnx2tf or ai_edge_torch separately)
     # ------------------------------------------------------------------
-    print("
-Exporting to ONNX…")
+    print("\nExporting to ONNX…")
     try:
         import onnx  # noqa: F401
         onnx_path = EXPORT_DIR / "vehicle_classifier.onnx"
@@ -433,10 +439,8 @@ Exporting to ONNX…")
     }
     manifest_path = EXPORT_DIR / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
-    print(f"
-Manifest → {manifest_path}")
-    print("
-Export complete.")
+    print(f"\nManifest → {manifest_path}")
+    print("\nExport complete.")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,11 @@
-import { usePlayerStore } from '@/stores/playerStore';
+import { supabase } from '@/lib/supabase';
 
 // export const API_BASE_URL = 'http://localhost:8000'; // dev
 export const API_BASE_URL = 'https://chadongcha-production.up.railway.app'; // prod
 
 async function request(method: string, path: string, body?: unknown) {
-  const token = usePlayerStore.getState().accessToken;
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers: {

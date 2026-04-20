@@ -305,7 +305,20 @@ async def compute_passes() -> None:
     # Fallback to seed locations if no players
     locations = list(unique_regions) if unique_regions else [(lat, lon) for lat, lon, city in SEED_LOCATIONS]
 
+    batch: list[dict] = []
     inserted = 0
+
+    def _flush(force: bool = False) -> None:
+        nonlocal inserted
+        if not batch or (not force and len(batch) < UPSERT_BATCH_SIZE):
+            return
+        try:
+            db.table("catchable_objects").upsert(batch, on_conflict="space_object_id,pass_start").execute()
+            inserted += len(batch)
+        except Exception as exc:
+            log.warning("Batch upsert failed (%d rows): %s", len(batch), exc)
+        batch.clear()
+
     for row in rows.data:
         try:
             sat = Satrec.twoline2rv(row["tle_line1"], row["tle_line2"])
@@ -316,7 +329,7 @@ async def compute_passes() -> None:
             try:
                 passes = _compute_passes_for_sat(sat, lat, lon, now, window_end)
                 for p in passes:
-                    db.table("catchable_objects").upsert({
+                    batch.append({
                         "space_object_id":  row["id"],
                         "pass_start":       p["pass_start"],
                         "pass_end":         p["pass_end"],
@@ -324,11 +337,12 @@ async def compute_passes() -> None:
                         "region_lat":       lat,
                         "region_lon":       lon,
                         "region_radius_km": 500,
-                    }, on_conflict="space_object_id,pass_start").execute()
-                    inserted += 1
+                    })
+                _flush()
             except Exception as exc:
                 log.warning("Pass compute error: %s", exc)
 
+    _flush(force=True)
     log.info("Pass computation complete — %d windows updated for %d regions", inserted, len(locations))
 
 

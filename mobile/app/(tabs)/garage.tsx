@@ -10,6 +10,7 @@ import { useCatchStore, type CatchRecord } from '@/stores/catchStore';
 import { usePlayerStore, type StoredBoost, MAX_STORED_BOOSTS } from '@/stores/playerStore';
 import { useMarketStore, type MarketListing } from '@/stores/marketStore';
 import { GarageCarousel } from '@/components/GarageCarousel';
+import { GhostCatchCard } from '@/components/GhostCatchCard';
 import { HexBadge } from '@/components/HexBadge';
 import { computeBadges, type Badge, type BadgeCategory } from '@/utils/badges';
 import { PaywallModal } from '@/components/PaywallModal';
@@ -805,9 +806,12 @@ export default function GarageScreen() {
 
   const spaceCatches  = useMemo(() => catches.filter(c => c.catchType === 'space'), [catches]);
   const syncedCatches = useMemo(() => catches.filter(c => c.synced), [catches]);
+  const ghostCatches  = useMemo(() => catches.filter(c => c.catchType === 'unknown'), [catches]);
 
   const displayedCatches = useMemo(() => {
-    let list = filterRarity === 'all' ? catches : catches.filter(c => (c.rarity ?? 'common') === filterRarity);
+    let list = filterRarity === 'all'
+      ? catches.filter(c => c.catchType !== 'unknown')
+      : catches.filter(c => c.catchType !== 'unknown' && (c.rarity ?? 'common') === filterRarity);
     if (sortMode === 'date')       return [...list].sort((a, b) => new Date(b.caughtAt).getTime() - new Date(a.caughtAt).getTime());
     if (sortMode === 'rarity_hi')  return [...list].sort((a, b) => (RARITY_ORDER[b.rarity ?? 'common'] ?? 0) - (RARITY_ORDER[a.rarity ?? 'common'] ?? 0));
     if (sortMode === 'rarity_lo')  return [...list].sort((a, b) => (RARITY_ORDER[a.rarity ?? 'common'] ?? 0) - (RARITY_ORDER[b.rarity ?? 'common'] ?? 0));
@@ -884,6 +888,22 @@ export default function GarageScreen() {
           </View>
         ) : (
           <View style={{ flex: 1 }}>
+            {/* Ghost Specimens section */}
+            {ghostCatches.length > 0 && filterRarity === 'all' && (
+              <View style={styles.ghostSection}>
+                <View style={styles.ghostSectionHeader}>
+                  <Text style={styles.ghostSectionTitle}>◈ GHOST SPECIMENS</Text>
+                  <Text style={styles.ghostSectionCount}>{ghostCatches.length}</Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.ghostRow}
+                >
+                  {ghostCatches.map(c => <GhostCatchCard key={c.id} item={c} />)}
+                </ScrollView>
+              </View>
+            )}
             {/* Controls row: count + sort cycle + view toggle */}
             <View style={styles.viewToggleRow}>
               <Text style={styles.count}>
@@ -1077,6 +1097,11 @@ function makeStyles(T: Theme) {
     tabTextActive:   { color: T.text },
 
     // Catches tab
+    ghostSection:       { paddingTop: 16, borderBottomWidth: 1, borderBottomColor: '#1a0a2e', marginBottom: 4 },
+    ghostSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 },
+    ghostSectionTitle:  { color: '#8b5cf6', fontSize: 11, fontWeight: '900', letterSpacing: 3 },
+    ghostSectionCount:  { color: '#4c1d95', fontSize: 11, fontWeight: '800' },
+    ghostRow:           { paddingHorizontal: 16, paddingBottom: 16 },
     viewToggleRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
     count:              { color: T.text2, fontSize: 13 },
     controlsRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },

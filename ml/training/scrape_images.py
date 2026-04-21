@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import json
 import logging
+import random
 import sys
 import time
 from io import BytesIO
@@ -1174,17 +1175,28 @@ def scrape_class(ddgs, gen_class: str, target: int, seen_hashes: set) -> int:
         if saved >= target:
             break
 
-        try:
-            results = list(ddgs.images(
-                query,
-                max_results=60,
-                type_image="photo",
-                size="medium",
-            ))
-        except Exception as exc:
-            log.warning("  DDG search failed for %r: %s", query, exc)
-            time.sleep(15)
-            continue
+        # Exponential backoff: up to 3 retries on rate-limit / search failure
+        results = []
+        for attempt in range(3):
+            try:
+                results = list(ddgs.images(
+                    query,
+                    max_results=50,
+                    type_image="photo",
+                    size="medium",
+                ))
+                break
+            except Exception as exc:
+                exc_str = str(exc).lower()
+                is_rate_limit = any(k in exc_str for k in ("ratelimit", "429", "202", "blocked", "forbidden"))
+                wait = (30 * (2 ** attempt)) + random.uniform(0, 10)
+                if is_rate_limit:
+                    log.warning("  DDG rate-limited on %r (attempt %d) — sleeping %.0fs", query, attempt + 1, wait)
+                else:
+                    log.warning("  DDG search failed for %r: %s — sleeping %.0fs", query, exc, wait)
+                time.sleep(wait)
+                if attempt == 2:
+                    log.warning("  Skipping query %r after 3 failed attempts", query)
 
         for result in results:
             if saved >= target:
@@ -1210,7 +1222,8 @@ def scrape_class(ddgs, gen_class: str, target: int, seen_hashes: set) -> int:
             saved += 1
             log.info("  [%d/%d] saved %s", saved, target, dest.name)
 
-        time.sleep(8)  # polite pause between queries — DDG rate-limits hard below ~8s
+        # Jittered inter-query pause — DDG rate-limits on short fixed intervals
+        time.sleep(random.uniform(10, 20))
 
     return saved
 
@@ -1219,20 +1232,26 @@ def scrape_class(ddgs, gen_class: str, target: int, seen_hashes: set) -> int:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def main(target_class, per_class: int) -> None:
+def main(target_class, per_class: int, class_delay: float) -> None:
     stats       = load_stats()
     seen_hashes = set(stats.get("seen_hashes", []))
     counts      = stats.get("counts", {})
 
     classes = [target_class] if target_class else list(CLASS_QUERIES.keys())
 
-    with DDGS() as ddgs:
-        for gen_class in classes:
+    for i, gen_class in enumerate(classes):
+        # Fresh DDGS session per class — avoids session-level rate limiting
+        with DDGS() as ddgs:
             n = scrape_class(ddgs, gen_class, per_class, seen_hashes)
-            counts[gen_class] = n
-            stats["counts"]      = counts
-            stats["seen_hashes"] = list(seen_hashes)
-            save_stats(stats)
+        counts[gen_class] = n
+        stats["counts"]      = counts
+        stats["seen_hashes"] = list(seen_hashes)
+        save_stats(stats)
+
+        if i < len(classes) - 1:
+            pause = class_delay + random.uniform(0, 15)
+            log.info("  Cooling down %.0fs before next class…", pause)
+            time.sleep(pause)
 
     log.info("\n=== Done ===")
     for gen_class in CLASS_QUERIES:
@@ -1243,15 +1262,17 @@ def main(target_class, per_class: int) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cls",       dest="target_class", help="Scrape one class only")
-    parser.add_argument("--per-class", type=int, default=IMAGES_PER_CLASS,
+    parser.add_argument("--cls",         dest="target_class", help="Scrape one class only")
+    parser.add_argument("--per-class",   type=int, default=IMAGES_PER_CLASS,
                         help=f"Images per class (default {IMAGES_PER_CLASS})")
-    parser.add_argument("--data-dir",  dest="data_dir", default=None,
+    parser.add_argument("--data-dir",    dest="data_dir", default=None,
                         help="Override image output directory (default: ml/data/images)")
+    parser.add_argument("--class-delay", dest="class_delay", type=float, default=60.0,
+                        help="Base seconds to wait between classes (default 60, +0–15 jitter)")
     args = parser.parse_args()
 
     if args.data_dir:
         DATA_DIR   = Path(args.data_dir)
         STATS_FILE = DATA_DIR.parent / "scrape_stats.json"
 
-    main(args.target_class, args.per_class)
+    main(args.target_class, args.per_class, args.class_delay)

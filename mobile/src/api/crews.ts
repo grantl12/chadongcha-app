@@ -7,6 +7,15 @@ export type CrewMember = {
   xp: number;
 };
 
+export type CrewRanking = {
+  id: string;
+  name: string;
+  home_city: string | null;
+  team_color: string;
+  member_count: number;
+  total_xp: number;
+};
+
 export type Crew = {
   id: string;
   name: string;
@@ -19,8 +28,11 @@ export type Crew = {
 };
 
 export const crewApi = {
-  list: (limit = 20, offset = 0) => 
+  list: (limit = 20, offset = 0) =>
     apiClient.get(`/crews/?limit=${limit}&offset=${offset}`) as Promise<Crew[]>,
+
+  leaderboard: (limit = 20) =>
+    apiClient.get(`/crews/leaderboard?limit=${limit}`) as Promise<CrewRanking[]>,
   
   get: (id: string) => 
     apiClient.get(`/crews/${id}`) as Promise<Crew>,

@@ -69,6 +69,19 @@ async def create_crew(body: CreateCrewRequest, authorization: str = Header(...))
             raise HTTPException(status_code=409, detail="A crew with this name already exists")
         raise HTTPException(status_code=500, detail=f"Could not create crew: {str(e)}")
 
+@router.get("/leaderboard")
+async def crew_leaderboard(limit: int = 20):
+    db = get_client()
+    res = db.table("crews").select("id, name, home_city, team_color, players(xp)").execute()
+    ranked = []
+    for c in (res.data or []):
+        members = c.pop("players", []) or []
+        c["member_count"] = len(members)
+        c["total_xp"] = sum(m.get("xp", 0) for m in members)
+        ranked.append(c)
+    ranked.sort(key=lambda c: c["total_xp"], reverse=True)
+    return ranked[:limit]
+
 @router.get("/{crew_id}")
 async def get_crew(crew_id: str):
     db = get_client()

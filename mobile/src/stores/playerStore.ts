@@ -65,6 +65,7 @@ type PlayerStore = {
   clearPendingBoostDecision: () => void;
   addStoredBoost: (boost: StoredBoost) => void;
   consumeStoredBoost: (id: string) => void;
+  setCrewId: (crewId: string | null) => void;
   setTheme: (theme: ThemeName) => void;
   clearSession: () => void;
 };
@@ -152,6 +153,10 @@ export const usePlayerStore = create<PlayerStore>()(
 
       consumeStoredBoost(id) {
         set(s => ({ storedBoosts: s.storedBoosts.filter(b => b.id !== id) }));
+      },
+
+      setCrewId(crewId) {
+        set({ crewId });
       },
 
       setTheme(theme) {

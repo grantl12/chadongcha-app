@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useCatchStore } from '@/stores/catchStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useTutorialStore } from '@/stores/tutorialStore';
 import { apiClient } from '@/api/client';
 import { sha256Plate } from '@/utils/plateHash';
 import { useTheme, THEMES, type Theme, type ThemeName } from '@/lib/theme';
@@ -142,6 +143,7 @@ export default function ProfileScreen() {
     theme: themeName, setTheme,
   } = usePlayerStore();
   const { privacyShieldEnabled, togglePrivacyShield, contributeScans, toggleContributeScans } = useSettingsStore();
+  const { replay: replayTutorial } = useTutorialStore();
   const queryClient = useQueryClient();
   const [plateInput, setPlateInput] = useState('');
   const [plateLabel, setPlateLabel] = useState('');
@@ -432,6 +434,13 @@ export default function ProfileScreen() {
             thumbColor="#fff"
           />
         </View>
+
+        <Pressable style={styles.settingRow} onPress={replayTutorial}>
+          <View style={styles.settingBody}>
+            <Text style={styles.settingLabel}>Replay Tutorial</Text>
+            <Text style={styles.settingDesc}>Walk through the app tour again from the beginning.</Text>
+          </View>
+        </Pressable>
       </View>
 
       {/* Actions */}

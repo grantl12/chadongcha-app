@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '@/stores/playerStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useTheme } from '@/lib/theme';
+import { TutorialOverlay } from '@/components/TutorialOverlay';
 
 function LevelUpBanner({ level }: { level: number }) {
   const T = useTheme();
@@ -64,6 +65,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} /> }} />
       </Tabs>
       {bannerKey && <LevelUpBanner key={bannerKey} level={bannerKey} />}
+      <TutorialOverlay />
     </View>
   );
 }

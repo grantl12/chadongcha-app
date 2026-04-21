@@ -1,12 +1,13 @@
 import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/client';
 import { useLocation } from '@/hooks/useLocation';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useCatchStore } from '@/stores/catchStore';
 import { BoostDecisionModal } from '@/components/BoostDecisionModal';
+import { useTheme, type Theme } from '@/lib/theme';
 
 type CatchableObject = {
   id: string;
@@ -51,11 +52,13 @@ function SatelliteRow({
   onCatch: (item: CatchableObject) => void;
   alreadyCaught: boolean;
 }) {
-  const obj    = item.space_objects;
-  const rarity = obj?.rarity_tier ?? 'common';
-  const color  = RARITY_COLOR[rarity] ?? '#555';
+  const T       = useTheme();
+  const styles  = useMemo(() => makeStyles(T), [T]);
+  const obj     = item.space_objects;
+  const rarity  = obj?.rarity_tier ?? 'common';
+  const color   = RARITY_COLOR[rarity] ?? '#555';
   const [until, setUntil] = useState(() => timeUntil(item.pass_start));
-  const isNow  = until === 'NOW';
+  const isNow   = until === 'NOW';
 
   useEffect(() => {
     const t = setInterval(() => setUntil(timeUntil(item.pass_start)), 1000);
@@ -64,7 +67,7 @@ function SatelliteRow({
 
   return (
     <View style={styles.satRow}>
-      <View style={[styles.satDot, { backgroundColor: alreadyCaught ? '#333' : color }]} />
+      <View style={[styles.satDot, { backgroundColor: alreadyCaught ? T.card2 : color }]} />
       <View style={styles.satBody}>
         <Text style={[styles.satName, alreadyCaught && styles.satNameDim]}>
           {obj?.name ?? 'Unknown Object'}
@@ -92,6 +95,8 @@ function SatelliteRow({
 }
 
 function OrbitalBoostBanner({ expires }: { expires: string | null }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [remaining, setRemaining] = useState(() => boostRemaining(expires));
 
   useEffect(() => {
@@ -114,6 +119,8 @@ function OrbitalBoostBanner({ expires }: { expires: string | null }) {
 }
 
 export default function OperationsScreen() {
+  const T                       = useTheme();
+  const styles                  = useMemo(() => makeStyles(T), [T]);
   const { latitude, longitude } = useLocation();
   const orbitalBoostExpires     = usePlayerStore(s => s.orbitalBoostExpires);
   const syncError               = useCatchStore(s => s.syncError);
@@ -199,7 +206,7 @@ export default function OperationsScreen() {
           <Text style={styles.satHint}>Enable location for satellite tracking.</Text>
         ) : satQuery.isLoading ? (
           <View style={styles.satLoadingRow}>
-            <ActivityIndicator size="small" color="#e63946" />
+            <ActivityIndicator size="small" color={T.accent} />
             <Text style={styles.satLoadingText}>Computing orbital passes…</Text>
           </View>
         ) : satQuery.isError ? (
@@ -228,54 +235,56 @@ export default function OperationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container:        { flex: 1, backgroundColor: '#0a0a0a', padding: 24, paddingTop: 70 },
+function makeStyles(T: Theme) {
+  return StyleSheet.create({
+    container:        { flex: 1, backgroundColor: T.bg, padding: 24, paddingTop: 70 },
 
-  syncErrorBanner:  { backgroundColor: '#1a0000', borderWidth: 1, borderColor: '#e6394644', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 12 },
-  syncErrorText:    { color: '#e63946', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  syncErrorDetail:  { color: '#e6394688', fontSize: 10, marginTop: 2 },
+    syncErrorBanner:  { backgroundColor: '#1a0000', borderWidth: 1, borderColor: '#e6394644', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 12 },
+    syncErrorText:    { color: '#e63946', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+    syncErrorDetail:  { color: '#e6394688', fontSize: 10, marginTop: 2 },
 
-  boostBanner:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 20 },
-  boostIcon:        { fontSize: 20 },
-  boostTitle:       { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  boostSub:         { color: '#f59e0b88', fontSize: 11, marginTop: 2 },
+    boostBanner:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 20 },
+    boostIcon:        { fontSize: 20 },
+    boostTitle:       { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+    boostSub:         { color: '#f59e0b88', fontSize: 11, marginTop: 2 },
 
-  modeSection:      { gap: 12, marginBottom: 40 },
-  title:            { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: 4 },
-  subtitle:         { color: '#444', fontSize: 12, marginBottom: 8 },
-  primaryButton:    { backgroundColor: '#e63946', borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24 },
-  secondaryButton:  { backgroundColor: '#141414', borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24, borderWidth: 1, borderColor: '#222' },
-  identifyButton:   { backgroundColor: '#141414', borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24, borderWidth: 1, borderColor: '#e6394633' },
-  buttonText:       { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 2 },
-  buttonSub:        { color: '#ffffff66', fontSize: 12, marginTop: 3 },
+    modeSection:      { gap: 12, marginBottom: 40 },
+    title:            { color: T.text, fontSize: 32, fontWeight: '900', letterSpacing: 4 },
+    subtitle:         { color: T.text3, fontSize: 12, marginBottom: 8 },
+    primaryButton:    { backgroundColor: T.accent, borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24 },
+    secondaryButton:  { backgroundColor: T.card, borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24, borderWidth: 1, borderColor: T.border },
+    identifyButton:   { backgroundColor: T.card, borderRadius: 10, paddingVertical: 18, paddingHorizontal: 24, borderWidth: 1, borderColor: T.accent + '33' },
+    buttonText:       { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 2 },
+    buttonSub:        { color: '#ffffff66', fontSize: 12, marginTop: 3 },
 
-  satSection:       { flex: 1 },
-  satHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  satTitle:         { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 3 },
-  satHint:          { color: '#333', fontSize: 13 },
-  statusPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
-  statusOnline:     { backgroundColor: '#0a1a0a', borderColor: '#1a3a1a' },
-  statusSyncing:    { backgroundColor: '#1a0a00', borderColor: '#3a1a00' },
-  statusError:      { backgroundColor: '#1a0a0a', borderColor: '#3a1a1a' },
-  statusDot:        { width: 5, height: 5, borderRadius: 3 },
-  statusDotOnline:  { backgroundColor: '#22c55e' },
-  statusDotSyncing: { backgroundColor: '#f59e0b' },
-  statusDotError:   { backgroundColor: '#e63946' },
-  statusText:       { color: '#555', fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
-  satLoadingRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  satLoadingText:   { color: '#333', fontSize: 13 },
-  satRow:           { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111' },
-  satDot:           { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
-  satBody:          { flex: 1, gap: 3 },
-  satName:          { color: '#fff', fontSize: 14, fontWeight: '700' },
-  satNameDim:       { color: '#444' },
-  satType:          { color: '#444', fontSize: 12 },
-  satRight:         { alignItems: 'flex-end', gap: 4 },
-  satCountdown:     { color: '#555', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  satCountdownNow:  { color: '#e63946' },
-  satCatchable:     { color: '#333', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
-  caughtBadge:      { color: '#22c55e', fontSize: 14, fontWeight: '900' },
+    satSection:       { flex: 1 },
+    satHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    satTitle:         { color: T.text3, fontSize: 11, fontWeight: '700', letterSpacing: 3 },
+    satHint:          { color: T.text3, fontSize: 13 },
+    statusPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
+    statusOnline:     { backgroundColor: T.card, borderColor: T.border },
+    statusSyncing:    { backgroundColor: '#1a0a00', borderColor: '#3a1a00' },
+    statusError:      { backgroundColor: '#1a0a0a', borderColor: '#3a1a1a' },
+    statusDot:        { width: 5, height: 5, borderRadius: 3 },
+    statusDotOnline:  { backgroundColor: '#22c55e' },
+    statusDotSyncing: { backgroundColor: '#f59e0b' },
+    statusDotError:   { backgroundColor: '#e63946' },
+    statusText:       { color: T.text3, fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+    satLoadingRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+    satLoadingText:   { color: T.text3, fontSize: 13 },
+    satRow:           { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: T.card },
+    satDot:           { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
+    satBody:          { flex: 1, gap: 3 },
+    satName:          { color: T.text, fontSize: 14, fontWeight: '700' },
+    satNameDim:       { color: T.text3 },
+    satType:          { color: T.text3, fontSize: 12 },
+    satRight:         { alignItems: 'flex-end', gap: 4 },
+    satCountdown:     { color: T.text2, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    satCountdownNow:  { color: T.accent },
+    satCatchable:     { color: T.text3, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+    caughtBadge:      { color: '#22c55e', fontSize: 14, fontWeight: '900' },
 
-  catchBtn:         { backgroundColor: '#e63946', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 12 },
-  catchBtnText:     { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 2 },
-});
+    catchBtn:         { backgroundColor: T.accent, borderRadius: 6, paddingVertical: 5, paddingHorizontal: 12 },
+    catchBtnText:     { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+  });
+}

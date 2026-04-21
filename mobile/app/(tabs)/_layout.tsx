@@ -4,8 +4,10 @@ import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '@/stores/playerStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useTheme } from '@/lib/theme';
 
 function LevelUpBanner({ level }: { level: number }) {
+  const T = useTheme();
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -17,7 +19,10 @@ function LevelUpBanner({ level }: { level: number }) {
   }, [level]);
 
   return (
-    <Animated.View style={[styles.banner, { opacity }]} pointerEvents="none">
+    <Animated.View
+      style={[styles.banner, { opacity, backgroundColor: T.accent, shadowColor: T.accent }]}
+      pointerEvents="none"
+    >
       <Text style={styles.bannerText}>LEVEL UP</Text>
       <Text style={styles.bannerLevel}>{level}</Text>
     </Animated.View>
@@ -27,6 +32,7 @@ function LevelUpBanner({ level }: { level: number }) {
 export default function TabsLayout() {
   const accessToken = usePlayerStore(s => s.accessToken);
   const level       = usePlayerStore(s => s.level);
+  const T           = useTheme();
   const [bannerKey, setBannerKey] = useState<number | null>(null);
   const prevLevel = useRef(level);
 
@@ -46,12 +52,12 @@ export default function TabsLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: { backgroundColor: '#0a0a0a', borderTopColor: '#1a1a1a' },
-          tabBarActiveTintColor: '#e63946',
-          tabBarInactiveTintColor: '#555',
+          tabBarStyle: { backgroundColor: T.bg, borderTopColor: T.border },
+          tabBarActiveTintColor: T.accent,
+          tabBarInactiveTintColor: T.text3,
         }}
       >
-        <Tabs.Screen name="index"   options={{ title: 'Ops',      tabBarIcon: ({ color, size }) => <Ionicons name="radio-outline"       size={size} color={color} /> }} />
+        <Tabs.Screen name="index"   options={{ title: 'Ops',     tabBarIcon: ({ color, size }) => <Ionicons name="radio-outline"        size={size} color={color} /> }} />
         <Tabs.Screen name="garage"  options={{ title: 'Garage',  tabBarIcon: ({ color, size }) => <Ionicons name="car-sport-outline"    size={size} color={color} /> }} />
         <Tabs.Screen name="map"     options={{ title: 'Roads',   tabBarIcon: ({ color, size }) => <Ionicons name="map-outline"          size={size} color={color} /> }} />
         <Tabs.Screen name="feed"    options={{ title: 'Feed',    tabBarIcon: ({ color, size }) => <Ionicons name="pulse-outline"        size={size} color={color} /> }} />
@@ -63,7 +69,7 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  banner:      { position: 'absolute', top: 80, alignSelf: 'center', backgroundColor: '#e63946', borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14, alignItems: 'center', gap: 2, shadowColor: '#e63946', shadowOpacity: 0.6, shadowRadius: 20, elevation: 10 },
+  banner:      { position: 'absolute', top: 80, alignSelf: 'center', borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14, alignItems: 'center', gap: 2, shadowOpacity: 0.6, shadowRadius: 20, elevation: 10 },
   bannerText:  { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 4 },
   bannerLevel: { color: '#fff', fontSize: 36, fontWeight: '900', lineHeight: 40 },
 });

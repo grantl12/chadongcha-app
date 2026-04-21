@@ -13,6 +13,7 @@ import { GarageCarousel } from '@/components/GarageCarousel';
 import { HexBadge } from '@/components/HexBadge';
 import { computeBadges, type Badge, type BadgeCategory } from '@/utils/badges';
 import { PaywallModal } from '@/components/PaywallModal';
+import { useTheme, type Theme } from '@/lib/theme';
 
 const FREE_GARAGE_LIMIT = 75;
 
@@ -86,6 +87,8 @@ const WHOLESALER_PRICES: Record<string, number> = {
 // ─── CatchCard ───────────────────────────────────────────────────────────────
 
 const CatchCard = memo(function CatchCard({ item, onSellPress }: { item: CatchRecord; onSellPress?: (item: CatchRecord) => void }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const rarity = item.rarity ?? (
     item.confidence >= 0.9  ? 'epic'     :
     item.confidence >= 0.8  ? 'rare'     :
@@ -132,6 +135,8 @@ const CatchCard = memo(function CatchCard({ item, onSellPress }: { item: CatchRe
 // ─── BadgeCard ───────────────────────────────────────────────────────────────
 
 const BadgeCard = memo(function BadgeCard({ badge }: { badge: Badge }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [expanded, setExpanded] = useState(false);
   const pct = badge.progress
     ? badge.progress.current / badge.progress.total
@@ -172,6 +177,8 @@ const CAT_COLORS: Record<BadgeCategory | 'all', string> = {
 // ─── Collection Tab ───────────────────────────────────────────────────────────
 
 function CollectionTab({ badges }: { badges: Badge[] }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [activeCat, setActiveCat] = useState<BadgeCategory | 'all'>('all');
   const earned = useMemo(() => badges.filter(b => b.earned).length, [badges]);
   const categories: (BadgeCategory | 'all')[] = ['all', 'enthusiast', 'grind', 'rarity', 'style', 'decade', 'social'];
@@ -234,6 +241,8 @@ function CollectionTab({ badges }: { badges: Badge[] }) {
 // ─── Market Tab ───────────────────────────────────────────────────────────────
 
 function ListingCard({ listing, onBid }: { listing: MarketListing; onBid: (l: MarketListing) => void }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const accent = RARITY_ACCENT[listing.rarity] ?? '#444';
   const bg     = RARITY_COLOR[listing.rarity]  ?? '#1a1a1a';
   const timeLeft = (() => {
@@ -283,6 +292,8 @@ function BidModal({ listing, visible, onClose }: {
   visible: boolean;
   onClose: () => void;
 }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [amount, setAmount] = useState('');
   const { placeBid, loading, error } = useMarketStore();
   const credits = usePlayerStore(s => s.credits);
@@ -359,6 +370,8 @@ function BidModal({ listing, visible, onClose }: {
 }
 
 function MarketTab({ mycatches }: { mycatches: CatchRecord[] }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const { listings, loading, error, fetchListings } = useMarketStore();
   const [bidTarget, setBidTarget] = useState<MarketListing | null>(null);
   const [viewMode, setViewMode] = useState<'browse' | 'sell'>('browse');
@@ -420,6 +433,8 @@ function MarketTab({ mycatches }: { mycatches: CatchRecord[] }) {
 }
 
 function SellTab({ catches }: { catches: CatchRecord[] }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const { createListing, loading, error } = useMarketStore();
   const [selected, setSelected] = useState<CatchRecord | null>(null);
   const [price, setPrice] = useState('');
@@ -512,6 +527,8 @@ const SPACE_WHOLESALER: Record<string, number> = {
 };
 
 function BoostStorageSection() {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const storedBoosts         = usePlayerStore(s => s.storedBoosts);
   const orbitalBoostExpires  = usePlayerStore(s => s.orbitalBoostExpires);
   const activateOrbitalBoost = usePlayerStore(s => s.activateOrbitalBoost);
@@ -594,6 +611,8 @@ function BoostStorageSection() {
 }
 
 function SpaceCatchCard({ item, onSell }: { item: CatchRecord; onSell?: (item: CatchRecord) => void }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const rarity = item.rarity ?? 'common';
   const color  = RARITY_ACCENT[rarity] ?? '#444';
   const bg     = RARITY_COLOR[rarity]  ?? '#1a1a1a';
@@ -627,6 +646,8 @@ function SpaceCatchCard({ item, onSell }: { item: CatchRecord; onSell?: (item: C
 }
 
 function OrbitalTab({ catches, onSell }: { catches: CatchRecord[]; onSell: (item: CatchRecord) => void }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.orbtContainer} showsVerticalScrollIndicator={false}>
       <BoostStorageSection />
@@ -661,6 +682,8 @@ function OrbitalTab({ catches, onSell }: { catches: CatchRecord[]; onSell: (item
 type ShopItem = { id: string; name: string; desc: string; cost: number; icon: string; category: string };
 
 function ShopTab() {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const credits          = usePlayerStore(s => s.credits);
   const applyShopPurchase = usePlayerStore(s => s.applyShopPurchase);
   const xpBoostExpires   = usePlayerStore(s => s.xpBoostExpires);
@@ -757,6 +780,8 @@ function ShopTab() {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GarageScreen() {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const catches       = useCatchStore(s => s.catches);
   const removeCatch   = useCatchStore(s => s.removeCatch);
   const syncError     = useCatchStore(s => s.syncError);
@@ -1024,215 +1049,217 @@ export default function GarageScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container:          { flex: 1, backgroundColor: '#0a0a0a' },
-  garageCap:          { backgroundColor: '#e63946', paddingVertical: 8, paddingHorizontal: 16, marginTop: 8, borderRadius: 8, alignItems: 'center' },
-  garageCapText:      { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  garageCapWarn:      { backgroundColor: '#1a0a0a', paddingVertical: 6, paddingHorizontal: 16, marginTop: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#e6394622' },
-  garageCapWarnText:  { color: '#e63946aa', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  syncErrorBanner:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2a0a0a', paddingHorizontal: 16, paddingVertical: 10, marginTop: 8, borderRadius: 8, borderWidth: 1, borderColor: '#e6394633' },
-  syncErrorText:      { color: '#e63946', fontSize: 12, fontWeight: '700', flex: 1 },
-  syncErrorDismiss:   { color: '#e63946', fontSize: 14, marginLeft: 12 },
-  syncPendingBanner:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#141414', paddingHorizontal: 16, paddingVertical: 8, marginTop: 8, borderRadius: 8 },
-  syncPendingText:    { color: '#444', fontSize: 12 },
+function makeStyles(T: Theme) {
+  return StyleSheet.create({
+    container:          { flex: 1, backgroundColor: T.bg },
+    garageCap:          { backgroundColor: T.accent, paddingVertical: 8, paddingHorizontal: 16, marginTop: 8, borderRadius: 8, alignItems: 'center' },
+    garageCapText:      { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+    garageCapWarn:      { backgroundColor: '#1a0a0a', paddingVertical: 6, paddingHorizontal: 16, marginTop: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#e6394622' },
+    garageCapWarnText:  { color: '#e63946aa', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+    syncErrorBanner:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2a0a0a', paddingHorizontal: 16, paddingVertical: 10, marginTop: 8, borderRadius: 8, borderWidth: 1, borderColor: '#e6394633' },
+    syncErrorText:      { color: '#e63946', fontSize: 12, fontWeight: '700', flex: 1 },
+    syncErrorDismiss:   { color: '#e63946', fontSize: 14, marginLeft: 12 },
+    syncPendingBanner:  { flexDirection: 'row', alignItems: 'center', backgroundColor: T.card, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8, borderRadius: 8 },
+    syncPendingText:    { color: T.text3, fontSize: 12 },
 
-  // Header
-  header:          { paddingHorizontal: 16, paddingTop: 60, paddingBottom: 10 },
-  title:           { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: 3 },
-  headerMeta:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  metaLabel:       { color: '#555', fontSize: 12, letterSpacing: 1, fontWeight: '600' },
-  metaDivider:     { color: '#333', fontSize: 12 },
+    // Header
+    header:          { paddingHorizontal: 16, paddingTop: 60, paddingBottom: 10 },
+    title:           { color: T.text, fontSize: 22, fontWeight: '900', letterSpacing: 3 },
+    headerMeta:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+    metaLabel:       { color: T.text2, fontSize: 12, letterSpacing: 1, fontWeight: '600' },
+    metaDivider:     { color: T.text3, fontSize: 12 },
 
-  // Tab bar
-  tabBar:          { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
-  tabBtn:          { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabBtnActive:    { borderBottomWidth: 2, borderBottomColor: '#fff' },
-  tabText:         { color: '#444', fontSize: 11, fontWeight: '800', letterSpacing: 2 },
-  tabTextActive:   { color: '#fff' },
+    // Tab bar
+    tabBar:          { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: T.card2 },
+    tabBtn:          { flex: 1, paddingVertical: 12, alignItems: 'center' },
+    tabBtnActive:    { borderBottomWidth: 2, borderBottomColor: T.text },
+    tabText:         { color: T.text3, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+    tabTextActive:   { color: T.text },
 
-  // Catches tab
-  viewToggleRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
-  count:              { color: '#555', fontSize: 13 },
-  controlsRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sortBtn:            { borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 },
-  sortBtnText:        { color: '#888', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  viewToggle:         { flexDirection: 'row', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 6, overflow: 'hidden' },
-  toggleBtn:          { paddingHorizontal: 10, paddingVertical: 5 },
-  toggleBtnActive:    { backgroundColor: '#1a1a1a' },
-  toggleText:         { color: '#444', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  toggleTextActive:   { color: '#fff' },
-  filterRow:          { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
-  filterChip:         { borderWidth: 1, borderColor: '#222', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  filterChipActive:   { borderColor: '#555', backgroundColor: '#1a1a1a' },
-  filterChipText:     { color: '#444', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  filterChipTextActive:{ color: '#fff' },
-  grid:               { padding: 12, paddingBottom: 40 },
-  row:                { gap: 10, marginBottom: 10 },
+    // Catches tab
+    viewToggleRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
+    count:              { color: T.text2, fontSize: 13 },
+    controlsRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    sortBtn:            { borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 },
+    sortBtnText:        { color: T.text2, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+    viewToggle:         { flexDirection: 'row', borderWidth: 1, borderColor: T.border, borderRadius: 6, overflow: 'hidden' },
+    toggleBtn:          { paddingHorizontal: 10, paddingVertical: 5 },
+    toggleBtnActive:    { backgroundColor: T.card2 },
+    toggleText:         { color: T.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+    toggleTextActive:   { color: T.text },
+    filterRow:          { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
+    filterChip:         { borderWidth: 1, borderColor: T.border, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+    filterChipActive:   { borderColor: T.text2, backgroundColor: T.card2 },
+    filterChipText:     { color: T.text3, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+    filterChipTextActive:{ color: T.text },
+    grid:               { padding: 12, paddingBottom: 40 },
+    row:                { gap: 10, marginBottom: 10 },
 
-  // Catch card
-  card:            { flex: 1, borderRadius: 12, borderWidth: 1, padding: 14, gap: 8, minHeight: 160 },
-  cardTop:         { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  typeBadge:       { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  typeText:        { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  unsyncedDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#555', marginLeft: 'auto' },
-  xpBadge:         { fontSize: 11, fontWeight: '700', marginLeft: 'auto' },
-  cardBody:        { flex: 1, gap: 2 },
-  cardMake:        { color: '#666', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' },
-  cardModel:       { color: '#fff', fontSize: 17, fontWeight: '800' },
-  cardGen:         { fontSize: 11, fontWeight: '600' },
-  cardBottom:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  rarityLabel:     { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  dateLabel:       { color: '#444', fontSize: 11 },
-  ffBadge:         { position: 'absolute', top: 10, right: 10, borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  ffText:          { fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+    // Catch card
+    card:            { flex: 1, borderRadius: 12, borderWidth: 1, padding: 14, gap: 8, minHeight: 160 },
+    cardTop:         { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    typeBadge:       { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+    typeText:        { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+    unsyncedDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: T.text2, marginLeft: 'auto' },
+    xpBadge:         { fontSize: 11, fontWeight: '700', marginLeft: 'auto' },
+    cardBody:        { flex: 1, gap: 2 },
+    cardMake:        { color: T.text3, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' },
+    cardModel:       { color: T.text, fontSize: 17, fontWeight: '800' },
+    cardGen:         { fontSize: 11, fontWeight: '600' },
+    cardBottom:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    rarityLabel:     { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+    dateLabel:       { color: T.text3, fontSize: 11 },
+    ffBadge:         { position: 'absolute', top: 10, right: 10, borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+    ffText:          { fontSize: 9, fontWeight: '800', letterSpacing: 1 },
 
-  // Empty state
-  empty:           { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle:      { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: 4 },
-  emptyText:       { color: '#444', marginTop: 12, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
+    // Empty state
+    empty:           { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    emptyTitle:      { color: T.text, fontSize: 28, fontWeight: '900', letterSpacing: 4 },
+    emptyText:       { color: T.text3, marginTop: 12, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
 
-  // Collection tab
-  collectionContainer: { padding: 16, paddingBottom: 60 },
-  collectionStats:     { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  statBlock:           { alignItems: 'center', paddingHorizontal: 24 },
-  statNum:             { color: '#fff', fontSize: 28, fontWeight: '900' },
-  statLabel:           { color: '#555', fontSize: 10, letterSpacing: 2, fontWeight: '700' },
-  statDivider:         { width: 1, height: 36, backgroundColor: '#222' },
-  masterProgress:      { height: 4, backgroundColor: '#1a1a1a', borderRadius: 2, marginBottom: 24, overflow: 'hidden' },
-  masterFill:          { height: '100%', backgroundColor: '#fff', borderRadius: 2 },
-  catTabsScroll:       { marginBottom: 16, marginHorizontal: -16 },
-  catTabsRow:          { paddingHorizontal: 16, gap: 4 },
-  catTab:              { paddingVertical: 8, paddingHorizontal: 10, borderBottomColor: 'transparent', borderBottomWidth: 2 },
-  catTabText:          { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
-  catTabCount:         { fontSize: 9, fontWeight: '700', textAlign: 'center', marginTop: 2 },
-  badgeGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' },
-  badgeCard:           { width: '30%', alignItems: 'center', gap: 6, paddingVertical: 8 },
-  badgeName:           { fontSize: 9, fontWeight: '700', letterSpacing: 0.3, textAlign: 'center', maxWidth: 76 },
-  badgeDesc:           { fontSize: 9, color: '#555', textAlign: 'center', marginTop: 2 },
-  progressBar:         { width: '90%', height: 3, backgroundColor: '#222', borderRadius: 2, overflow: 'hidden' },
-  progressFill:        { height: '100%', borderRadius: 2 },
-  progressText:        { color: '#444', fontSize: 9, fontWeight: '700' },
+    // Collection tab
+    collectionContainer: { padding: 16, paddingBottom: 60 },
+    collectionStats:     { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+    statBlock:           { alignItems: 'center', paddingHorizontal: 24 },
+    statNum:             { color: T.text, fontSize: 28, fontWeight: '900' },
+    statLabel:           { color: T.text2, fontSize: 10, letterSpacing: 2, fontWeight: '700' },
+    statDivider:         { width: 1, height: 36, backgroundColor: T.border },
+    masterProgress:      { height: 4, backgroundColor: T.card2, borderRadius: 2, marginBottom: 24, overflow: 'hidden' },
+    masterFill:          { height: '100%', backgroundColor: T.text, borderRadius: 2 },
+    catTabsScroll:       { marginBottom: 16, marginHorizontal: -16 },
+    catTabsRow:          { paddingHorizontal: 16, gap: 4 },
+    catTab:              { paddingVertical: 8, paddingHorizontal: 10, borderBottomColor: 'transparent', borderBottomWidth: 2 },
+    catTabText:          { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
+    catTabCount:         { fontSize: 9, fontWeight: '700', textAlign: 'center', marginTop: 2 },
+    badgeGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' },
+    badgeCard:           { width: '30%', alignItems: 'center', gap: 6, paddingVertical: 8 },
+    badgeName:           { fontSize: 9, fontWeight: '700', letterSpacing: 0.3, textAlign: 'center', maxWidth: 76 },
+    badgeDesc:           { fontSize: 9, color: T.text2, textAlign: 'center', marginTop: 2 },
+    progressBar:         { width: '90%', height: 3, backgroundColor: T.border, borderRadius: 2, overflow: 'hidden' },
+    progressFill:        { height: '100%', borderRadius: 2 },
+    progressText:        { color: T.text3, fontSize: 9, fontWeight: '700' },
 
-  // Market tab
-  marketNav:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
-  marketNavBtn:    { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  marketNavActive: { borderBottomWidth: 1, borderBottomColor: '#555' },
-  marketNavText:   { color: '#444', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  marketNavTextActive: { color: '#aaa' },
-  marketList:      { padding: 12, paddingBottom: 40 },
-  listingCard:     { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
-  listingTop:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  listingMake:     { color: '#666', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' },
-  listingModel:    { color: '#fff', fontSize: 18, fontWeight: '800' },
-  listingGen:      { fontSize: 11, fontWeight: '600', marginTop: 2 },
-  listingRight:    { alignItems: 'flex-end', gap: 4 },
-  listingRarity:   { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  listingColor:    { color: '#555', fontSize: 11 },
-  listingBottom:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  listingAsk:      { color: '#fff', fontSize: 18, fontWeight: '900' },
-  listingTopBid:   { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  listingMeta:     { alignItems: 'flex-end', gap: 2 },
-  listingBidCount: { color: '#555', fontSize: 11 },
-  listingExpiry:   { color: '#444', fontSize: 11 },
+    // Market tab
+    marketNav:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: T.card2 },
+    marketNavBtn:    { flex: 1, paddingVertical: 10, alignItems: 'center' },
+    marketNavActive: { borderBottomWidth: 1, borderBottomColor: T.text2 },
+    marketNavText:   { color: T.text3, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+    marketNavTextActive: { color: T.text2 },
+    marketList:      { padding: 12, paddingBottom: 40 },
+    listingCard:     { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
+    listingTop:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    listingMake:     { color: T.text3, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' },
+    listingModel:    { color: T.text, fontSize: 18, fontWeight: '800' },
+    listingGen:      { fontSize: 11, fontWeight: '600', marginTop: 2 },
+    listingRight:    { alignItems: 'flex-end', gap: 4 },
+    listingRarity:   { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+    listingColor:    { color: T.text2, fontSize: 11 },
+    listingBottom:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+    listingAsk:      { color: T.text, fontSize: 18, fontWeight: '900' },
+    listingTopBid:   { fontSize: 12, fontWeight: '600', marginTop: 2 },
+    listingMeta:     { alignItems: 'flex-end', gap: 2 },
+    listingBidCount: { color: T.text2, fontSize: 11 },
+    listingExpiry:   { color: T.text3, fontSize: 11 },
 
-  // Bid modal
-  modalOverlay:    { flex: 1, backgroundColor: '#000000bb', justifyContent: 'flex-end' },
-  modalCard:       { backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 12 },
-  modalTitle:      { color: '#fff', fontSize: 20, fontWeight: '900' },
-  modalSub:        { color: '#666', fontSize: 13 },
-  modalRow:        { flexDirection: 'row', justifyContent: 'space-between' },
-  modalLabel:      { color: '#555', fontSize: 13 },
-  modalValue:      { color: '#fff', fontSize: 13, fontWeight: '700' },
-  modalError:      { color: '#e63946', fontSize: 12 },
-  bidInput:        { borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 8, padding: 12, color: '#fff', fontSize: 16, backgroundColor: '#0d0d0d' },
-  bidBtn:          { backgroundColor: '#fff', borderRadius: 10, padding: 14, alignItems: 'center' },
-  bidBtnText:      { color: '#000', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+    // Bid modal
+    modalOverlay:    { flex: 1, backgroundColor: '#000000bb', justifyContent: 'flex-end' },
+    modalCard:       { backgroundColor: T.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 12 },
+    modalTitle:      { color: T.text, fontSize: 20, fontWeight: '900' },
+    modalSub:        { color: T.text3, fontSize: 13 },
+    modalRow:        { flexDirection: 'row', justifyContent: 'space-between' },
+    modalLabel:      { color: T.text2, fontSize: 13 },
+    modalValue:      { color: T.text, fontSize: 13, fontWeight: '700' },
+    modalError:      { color: '#e63946', fontSize: 12 },
+    bidInput:        { borderWidth: 1, borderColor: T.border, borderRadius: 8, padding: 12, color: T.text, fontSize: 16, backgroundColor: T.bg },
+    bidBtn:          { backgroundColor: T.text, borderRadius: 10, padding: 14, alignItems: 'center' },
+    bidBtnText:      { color: T.bg, fontSize: 14, fontWeight: '900', letterSpacing: 1 },
 
-  // Sell tab
-  sellContainer:   { padding: 16, paddingBottom: 60 },
-  sellHeading:     { color: '#555', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 12 },
-  sellCard:        { backgroundColor: '#111', borderRadius: 10, borderWidth: 1, borderColor: '#222', padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sellMake:        { color: '#666', fontSize: 11, letterSpacing: 1, flex: 0 },
-  sellModel:       { color: '#fff', fontSize: 15, fontWeight: '800', flex: 1 },
-  sellRarity:      { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  selectedMark:    { width: 6, height: 6, borderRadius: 3 },
-  priceSection:    { marginTop: 20, gap: 12 },
+    // Sell tab
+    sellContainer:   { padding: 16, paddingBottom: 60 },
+    sellHeading:     { color: T.text2, fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 12 },
+    sellCard:        { backgroundColor: T.card, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    sellMake:        { color: T.text3, fontSize: 11, letterSpacing: 1, flex: 0 },
+    sellModel:       { color: T.text, fontSize: 15, fontWeight: '800', flex: 1 },
+    sellRarity:      { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+    selectedMark:    { width: 6, height: 6, borderRadius: 3 },
+    priceSection:    { marginTop: 20, gap: 12 },
 
-  // Misc
-  centered:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  errorText:       { color: '#e63946', fontSize: 14, textAlign: 'center', marginBottom: 16 },
-  retryBtn:        { borderWidth: 1, borderColor: '#333', borderRadius: 8, paddingHorizontal: 20, paddingVertical: 10 },
-  retryText:       { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-  sellHint:        { color: '#2a2a2a', fontSize: 11, textAlign: 'center', paddingBottom: 12 },
+    // Misc
+    centered:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    errorText:       { color: '#e63946', fontSize: 14, textAlign: 'center', marginBottom: 16 },
+    retryBtn:        { borderWidth: 1, borderColor: T.text3, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 10 },
+    retryText:       { color: T.text, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+    sellHint:        { color: T.text3, fontSize: 11, textAlign: 'center', paddingBottom: 12 },
 
-  // Sell to wholesaler modal
-  sellModal:          { width: '100%', backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, gap: 10, borderTopWidth: 1, borderColor: '#1a1a1a' },
-  sellModalTitle:     { color: '#555', fontSize: 10, fontWeight: '800', letterSpacing: 3, textAlign: 'center' },
-  sellModalCar:       { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
-  sellModalRarity:    { fontSize: 12, fontWeight: '800', letterSpacing: 2, textAlign: 'center' },
-  sellModalPrice:     { color: '#fff', fontSize: 36, fontWeight: '900', textAlign: 'center', letterSpacing: 2 },
-  sellModalNote:      { color: '#444', fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: 4 },
-  sellModalBtns:      { flexDirection: 'row', gap: 10, marginTop: 8 },
-  sellModalCancel:    { flex: 1, backgroundColor: '#1a1a1a', borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
-  sellModalCancelText:{ color: '#555', fontSize: 13, fontWeight: '800', letterSpacing: 2 },
-  sellModalConfirm:   { flex: 1, backgroundColor: '#e63946', borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
-  sellModalConfirmText:{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 2 },
+    // Sell to wholesaler modal
+    sellModal:          { width: '100%', backgroundColor: T.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, gap: 10, borderTopWidth: 1, borderColor: T.card2 },
+    sellModalTitle:     { color: T.text2, fontSize: 10, fontWeight: '800', letterSpacing: 3, textAlign: 'center' },
+    sellModalCar:       { color: T.text, fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
+    sellModalRarity:    { fontSize: 12, fontWeight: '800', letterSpacing: 2, textAlign: 'center' },
+    sellModalPrice:     { color: T.text, fontSize: 36, fontWeight: '900', textAlign: 'center', letterSpacing: 2 },
+    sellModalNote:      { color: T.text3, fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: 4 },
+    sellModalBtns:      { flexDirection: 'row', gap: 10, marginTop: 8 },
+    sellModalCancel:    { flex: 1, backgroundColor: T.card2, borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
+    sellModalCancelText:{ color: T.text2, fontSize: 13, fontWeight: '800', letterSpacing: 2 },
+    sellModalConfirm:   { flex: 1, backgroundColor: T.accent, borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
+    sellModalConfirmText:{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 2 },
 
-  // Orbital tab
-  orbtContainer:      { padding: 16, paddingBottom: 60, gap: 24 },
-  orbtSection:        { gap: 12 },
-  orbtSectionTitle:   { color: '#333', fontSize: 10, fontWeight: '800', letterSpacing: 3, marginBottom: 4 },
+    // Orbital tab
+    orbtContainer:      { padding: 16, paddingBottom: 60, gap: 24 },
+    orbtSection:        { gap: 12 },
+    orbtSectionTitle:   { color: T.text3, fontSize: 10, fontWeight: '800', letterSpacing: 3, marginBottom: 4 },
 
-  activeBoostBanner:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14 },
-  activeBoostIcon:    { fontSize: 22 },
-  activeBoostTitle:   { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  activeBoostSub:     { color: '#f59e0b88', fontSize: 11, marginTop: 2 },
-  noBoostHint:        { color: '#333', fontSize: 13 },
+    activeBoostBanner:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14 },
+    activeBoostIcon:    { fontSize: 22 },
+    activeBoostTitle:   { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+    activeBoostSub:     { color: '#f59e0b88', fontSize: 11, marginTop: 2 },
+    noBoostHint:        { color: T.text3, fontSize: 13 },
 
-  storedList:         { gap: 8 },
-  storedHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  storedTitle:        { color: '#555', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
-  storedCount:        { color: '#444', fontSize: 11 },
-  storedCard:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, padding: 12, gap: 10 },
-  storedCardLeft:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  storedMulti:        { fontSize: 22, fontWeight: '900', width: 44 },
-  storedName:         { color: '#fff', fontSize: 13, fontWeight: '700' },
-  storedMeta:         { color: '#555', fontSize: 11, marginTop: 2 },
-  activateBtn:        { borderWidth: 1, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 12 },
-  activateBtnDim:     { opacity: 0.5 },
-  activateBtnText:    { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+    storedList:         { gap: 8 },
+    storedHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    storedTitle:        { color: T.text2, fontSize: 10, fontWeight: '800', letterSpacing: 2 },
+    storedCount:        { color: T.text3, fontSize: 11 },
+    storedCard:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, padding: 12, gap: 10 },
+    storedCardLeft:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    storedMulti:        { fontSize: 22, fontWeight: '900', width: 44 },
+    storedName:         { color: T.text, fontSize: 13, fontWeight: '700' },
+    storedMeta:         { color: T.text2, fontSize: 11, marginTop: 2 },
+    activateBtn:        { borderWidth: 1, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 12 },
+    activateBtnDim:     { opacity: 0.5 },
+    activateBtnText:    { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
 
-  orbtEmpty:          { alignItems: 'center', paddingVertical: 32, gap: 10 },
-  orbtEmptyTitle:     { color: '#333', fontSize: 22, fontWeight: '900', letterSpacing: 3 },
-  orbtEmptyText:      { color: '#2a2a2a', fontSize: 13, textAlign: 'center', lineHeight: 19 },
+    orbtEmpty:          { alignItems: 'center', paddingVertical: 32, gap: 10 },
+    orbtEmptyTitle:     { color: T.text3, fontSize: 22, fontWeight: '900', letterSpacing: 3 },
+    orbtEmptyText:      { color: T.text3, fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
-  spaceGrid:          { gap: 10 },
-  spaceCard:          { borderRadius: 12, borderWidth: 1, padding: 14, gap: 6 },
-  spaceCardTop:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  spaceTypeBadge:     { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  spaceTypeText:      { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  spaceCardName:      { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
-  spaceCardType:      { fontSize: 11, fontWeight: '600', letterSpacing: 1 },
-  spaceCardBottom:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  spaceRarity:        { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  spaceDate:          { fontSize: 11 },
-  spaceSellHint:      { fontSize: 10, fontWeight: '700' },
+    spaceGrid:          { gap: 10 },
+    spaceCard:          { borderRadius: 12, borderWidth: 1, padding: 14, gap: 6 },
+    spaceCardTop:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    spaceTypeBadge:     { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+    spaceTypeText:      { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+    spaceCardName:      { color: T.text, fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+    spaceCardType:      { fontSize: 11, fontWeight: '600', letterSpacing: 1 },
+    spaceCardBottom:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+    spaceRarity:        { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+    spaceDate:          { fontSize: 11 },
+    spaceSellHint:      { fontSize: 10, fontWeight: '700' },
 
-  // Shop tab
-  shopContainer:      { padding: 20, paddingBottom: 60, gap: 12 },
-  shopBalance:        { color: '#fff', fontSize: 40, fontWeight: '900', textAlign: 'center', letterSpacing: 2 },
-  shopBalanceLabel:   { color: '#333', fontSize: 10, fontWeight: '800', letterSpacing: 3, textAlign: 'center', marginBottom: 8 },
-  activeBoosts:       { backgroundColor: '#111', borderRadius: 10, padding: 14, gap: 6, borderWidth: 1, borderColor: '#1a1a1a' },
-  activeBoostsLabel:  { color: '#333', fontSize: 9, fontWeight: '800', letterSpacing: 3 },
-  activeBoostItem:    { color: '#22c55e', fontSize: 13, fontWeight: '700' },
-  shopItem:           { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: '#1a1a1a' },
-  shopItemIcon:       { fontSize: 28, width: 36, textAlign: 'center' },
-  shopItemBody:       { flex: 1, gap: 3 },
-  shopItemName:       { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
-  shopItemDesc:       { color: '#444', fontSize: 11, lineHeight: 15 },
-  shopItemRight:      { alignItems: 'flex-end', gap: 6 },
-  shopItemCost:       { color: '#888', fontSize: 12, fontWeight: '700' },
-  shopBuyBtn:         { backgroundColor: '#e63946', borderRadius: 7, paddingVertical: 7, paddingHorizontal: 14 },
-  shopBuyBtnDim:      { backgroundColor: '#2a2a2a' },
-  shopBuyBtnText:     { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-});
+    // Shop tab
+    shopContainer:      { padding: 20, paddingBottom: 60, gap: 12 },
+    shopBalance:        { color: T.text, fontSize: 40, fontWeight: '900', textAlign: 'center', letterSpacing: 2 },
+    shopBalanceLabel:   { color: T.text3, fontSize: 10, fontWeight: '800', letterSpacing: 3, textAlign: 'center', marginBottom: 8 },
+    activeBoosts:       { backgroundColor: T.card, borderRadius: 10, padding: 14, gap: 6, borderWidth: 1, borderColor: T.card2 },
+    activeBoostsLabel:  { color: T.text3, fontSize: 9, fontWeight: '800', letterSpacing: 3 },
+    activeBoostItem:    { color: '#22c55e', fontSize: 13, fontWeight: '700' },
+    shopItem:           { flexDirection: 'row', alignItems: 'center', backgroundColor: T.card, borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: T.card2 },
+    shopItemIcon:       { fontSize: 28, width: 36, textAlign: 'center' },
+    shopItemBody:       { flex: 1, gap: 3 },
+    shopItemName:       { color: T.text, fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+    shopItemDesc:       { color: T.text3, fontSize: 11, lineHeight: 15 },
+    shopItemRight:      { alignItems: 'flex-end', gap: 6 },
+    shopItemCost:       { color: T.text2, fontSize: 12, fontWeight: '700' },
+    shopBuyBtn:         { backgroundColor: T.accent, borderRadius: 7, paddingVertical: 7, paddingHorizontal: 14 },
+    shopBuyBtnDim:      { backgroundColor: T.card2 },
+    shopBuyBtnText:     { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  });
+}

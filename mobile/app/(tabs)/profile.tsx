@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Switch, TextInput, Alert } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,9 +7,9 @@ import { useCatchStore } from '@/stores/catchStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { apiClient } from '@/api/client';
 import { sha256Plate } from '@/utils/plateHash';
+import { useTheme, THEMES, type Theme, type ThemeName } from '@/lib/theme';
 
 // ─── Level math (mirrors backend _level_for_xp) ────────────────────────────
-// Bands: [level, xpMin, xpMax | null]
 const LEVEL_BANDS = [
   { level: 1,  xpMin: 0,       xpMax: 2001 },
   { level: 6,  xpMin: 2001,    xpMax: 10001 },
@@ -71,10 +71,13 @@ const BADGE_EMOJI: Record<string, string> = {
   'Global Elite':       '🌐',
   'World First':        '★',
 };
+const THEME_NAMES: ThemeName[] = ['tactical', 'carbon', 'ghost'];
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function BoostBanner({ expires }: { expires: string | null }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   if (!expires) return null;
   const remaining = Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / 60000));
   if (remaining <= 0) return null;
@@ -90,10 +93,11 @@ function BoostBanner({ expires }: { expires: string | null }) {
 }
 
 function RarityBar({ byRarity, total }: { byRarity: Record<string, number>; total: number }) {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   if (total === 0) return null;
   return (
     <View style={styles.raritySection}>
-      {/* Stacked bar */}
       <View style={styles.rarityBar}>
         {RARITY_ORDER.map(r => {
           const count = byRarity[r] ?? 0;
@@ -107,7 +111,6 @@ function RarityBar({ byRarity, total }: { byRarity: Record<string, number>; tota
           );
         })}
       </View>
-      {/* Legend */}
       <View style={styles.rarityLegend}>
         {RARITY_ORDER.map(r => {
           const count = byRarity[r] ?? 0;
@@ -129,10 +132,14 @@ function RarityBar({ byRarity, total }: { byRarity: Record<string, number>; tota
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
+  const T = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
+
   const {
     xp, level, username, userId,
     clearSession, setPlayer, setFullProfile,
     accessToken, orbitalBoostExpires,
+    theme: themeName, setTheme,
   } = usePlayerStore();
   const { privacyShieldEnabled, togglePrivacyShield, contributeScans, toggleContributeScans } = useSettingsStore();
   const queryClient = useQueryClient();
@@ -177,7 +184,6 @@ export default function ProfileScreen() {
     }
   }
 
-  // Re-sync from server each focus
   useFocusEffect(useCallback(() => {
     if (!accessToken || !userId) return;
     apiClient.get('/auth/me')
@@ -224,7 +230,6 @@ export default function ProfileScreen() {
         <Text style={styles.username}>{username ?? 'Driver'}</Text>
         <Text style={styles.levelLabel}>LEVEL {level}</Text>
 
-        {/* XP progress */}
         <View style={styles.xpRow}>
           <Text style={styles.xpCurrent}>{xp.toLocaleString()} XP</Text>
           {!atMaxLevel && (
@@ -236,7 +241,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Orbital Boost */}
       <BoostBanner expires={orbitalBoostExpires} />
 
       {/* Key stats */}
@@ -244,18 +248,21 @@ export default function ProfileScreen() {
         <StatCell
           value={statsLoading ? '—' : String(stats?.total_catches ?? 0)}
           label="CAUGHT"
-          accent="#fff"
+          accent={T.text}
+          styles={styles}
         />
         <View style={styles.statDivider} />
         <StatCell
           value={statsLoading ? '—' : String(stats?.road_king_count ?? 0)}
           label="ROAD KING"
-          accent="#e63946"
+          accent={T.accent}
+          styles={styles}
         />
         <View style={styles.statDivider} />
         <StatCell
           value={xp.toLocaleString()}
           label="TOTAL XP"
+          styles={styles}
         />
       </View>
 
@@ -284,7 +291,6 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {/* Empty badges hint */}
       {!statsLoading && stats && stats.first_finder_badges.length === 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>FIRST FINDER BADGES</Text>
@@ -310,7 +316,7 @@ export default function ProfileScreen() {
             <TextInput
               style={styles.plateInput}
               placeholder="Plate number (e.g. ABC 1234)"
-              placeholderTextColor="#444"
+              placeholderTextColor={T.text3}
               value={plateInput}
               onChangeText={setPlateInput}
               autoCapitalize="characters"
@@ -319,7 +325,7 @@ export default function ProfileScreen() {
             <TextInput
               style={styles.plateInput}
               placeholder="Label (optional — e.g. Daily driver)"
-              placeholderTextColor="#444"
+              placeholderTextColor={T.text3}
               value={plateLabel}
               onChangeText={setPlateLabel}
               autoCorrect={false}
@@ -360,6 +366,41 @@ export default function ProfileScreen() {
       {/* Settings */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>SETTINGS</Text>
+
+        {/* Theme picker */}
+        <View style={styles.themeSection}>
+          <Text style={styles.settingLabel}>Theme</Text>
+          <View style={styles.themeRow}>
+            {THEME_NAMES.map(name => {
+              const th = THEMES[name];
+              const active = themeName === name;
+              return (
+                <Pressable
+                  key={name}
+                  style={[
+                    styles.themePill,
+                    {
+                      borderColor:     active ? th.accent : T.border,
+                      backgroundColor: active ? th.accent + '18' : T.card,
+                    },
+                  ]}
+                  onPress={() => setTheme(name)}
+                >
+                  <View style={[styles.themeAccentDot, { backgroundColor: th.accent }]} />
+                  <View>
+                    <Text style={[styles.themePillName, { color: active ? th.accent : T.text2 }]}>
+                      {th.name}
+                    </Text>
+                    <Text style={[styles.themePillTag, { color: active ? th.accent + '99' : T.text3 }]}>
+                      {th.tagline}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
         <View style={styles.settingRow}>
           <View style={styles.settingBody}>
             <Text style={styles.settingLabel}>Privacy Shield</Text>
@@ -368,7 +409,7 @@ export default function ProfileScreen() {
           <Switch
             value={privacyShieldEnabled}
             onValueChange={togglePrivacyShield}
-            trackColor={{ false: '#222', true: '#e63946' }}
+            trackColor={{ false: T.border, true: T.accent }}
             thumbColor="#fff"
           />
         </View>
@@ -387,7 +428,7 @@ export default function ProfileScreen() {
           <Switch
             value={contributeScans}
             onValueChange={toggleContributeScans}
-            trackColor={{ false: '#222', true: '#4a9eff' }}
+            trackColor={{ false: T.border, true: T.accent3 }}
             thumbColor="#fff"
           />
         </View>
@@ -414,7 +455,7 @@ export default function ProfileScreen() {
   );
 }
 
-function StatCell({ value, label, accent }: { value: string; label: string; accent?: string }) {
+function StatCell({ value, label, accent, styles }: { value: string; label: string; accent?: string; styles: ReturnType<typeof makeStyles> }) {
   return (
     <View style={styles.statCell}>
       <Text style={[styles.statValue, accent ? { color: accent } : null]}>{value}</Text>
@@ -423,71 +464,80 @@ function StatCell({ value, label, accent }: { value: string; label: string; acce
   );
 }
 
-const styles = StyleSheet.create({
-  container:         { flex: 1, backgroundColor: '#0a0a0a' },
-  content:           { padding: 24, paddingTop: 72, paddingBottom: 48, gap: 24 },
+function makeStyles(T: Theme) {
+  return StyleSheet.create({
+    container:         { flex: 1, backgroundColor: T.bg },
+    content:           { padding: 24, paddingTop: 72, paddingBottom: 48, gap: 24 },
 
-  identityBlock:     { gap: 6 },
-  username:          { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: -0.5 },
-  levelLabel:        { color: '#e63946', fontSize: 12, fontWeight: '800', letterSpacing: 3 },
-  xpRow:             { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  xpCurrent:         { color: '#888', fontSize: 13 },
-  xpNext:            { color: '#333', fontSize: 13 },
-  barTrack:          { height: 3, backgroundColor: '#1a1a1a', borderRadius: 2, overflow: 'hidden' },
-  barFill:           { height: 3, backgroundColor: '#e63946', borderRadius: 2 },
+    identityBlock:     { gap: 6 },
+    username:          { color: T.text, fontSize: 32, fontWeight: '900', letterSpacing: -0.5 },
+    levelLabel:        { color: T.accent, fontSize: 12, fontWeight: '800', letterSpacing: 3 },
+    xpRow:             { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+    xpCurrent:         { color: T.text2, fontSize: 13 },
+    xpNext:            { color: T.text3, fontSize: 13 },
+    barTrack:          { height: 3, backgroundColor: T.card2, borderRadius: 2, overflow: 'hidden' },
+    barFill:           { height: 3, backgroundColor: T.accent, borderRadius: 2 },
 
-  boostBanner:       { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14 },
-  boostIcon:         { fontSize: 20 },
-  boostTitle:        { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  boostSub:          { color: '#f59e0b66', fontSize: 11, marginTop: 2 },
+    boostBanner:       { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#f59e0b44', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14 },
+    boostIcon:         { fontSize: 20 },
+    boostTitle:        { color: '#f59e0b', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+    boostSub:          { color: '#f59e0b66', fontSize: 11, marginTop: 2 },
 
-  statsRow:          { flexDirection: 'row', backgroundColor: '#111', borderRadius: 12, paddingVertical: 20 },
-  statCell:          { flex: 1, alignItems: 'center', gap: 4 },
-  statValue:         { color: '#fff', fontSize: 24, fontWeight: '900' },
-  statLabel:         { color: '#444', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
-  statDivider:       { width: 1, backgroundColor: '#1a1a1a', marginVertical: 4 },
+    statsRow:          { flexDirection: 'row', backgroundColor: T.card, borderRadius: 12, paddingVertical: 20 },
+    statCell:          { flex: 1, alignItems: 'center', gap: 4 },
+    statValue:         { color: T.text, fontSize: 24, fontWeight: '900' },
+    statLabel:         { color: T.text3, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+    statDivider:       { width: 1, backgroundColor: T.card2, marginVertical: 4 },
 
-  section:           { gap: 12 },
-  sectionTitle:      { color: '#333', fontSize: 10, fontWeight: '800', letterSpacing: 3 },
-  emptyHint:         { color: '#2a2a2a', fontSize: 13, fontStyle: 'italic' },
+    section:           { gap: 12 },
+    sectionTitle:      { color: T.text3, fontSize: 10, fontWeight: '800', letterSpacing: 3 },
+    emptyHint:         { color: T.text3, fontSize: 13, fontStyle: 'italic' },
 
-  raritySection:     { gap: 10 },
-  rarityBar:         { height: 6, flexDirection: 'row', borderRadius: 3, overflow: 'hidden', gap: 1 },
-  raritySegment:     { borderRadius: 2 },
-  rarityLegend:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  rarityLegendItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  rarityDot:         { width: 6, height: 6, borderRadius: 3 },
-  rarityLegendText:  { color: '#555', fontSize: 11, fontWeight: '600' },
+    raritySection:     { gap: 10 },
+    rarityBar:         { height: 6, flexDirection: 'row', borderRadius: 3, overflow: 'hidden', gap: 1 },
+    raritySegment:     { borderRadius: 2 },
+    rarityLegend:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    rarityLegendItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    rarityDot:         { width: 6, height: 6, borderRadius: 3 },
+    rarityLegendText:  { color: T.text2, fontSize: 11, fontWeight: '600' },
 
-  badgeRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111', gap: 12 },
-  badgeEmoji:        { fontSize: 20, width: 28, textAlign: 'center' },
-  badgeBody:         { flex: 1, gap: 2 },
-  badgeName:         { color: '#fff', fontSize: 14, fontWeight: '700' },
-  badgeVehicle:      { color: '#555', fontSize: 12 },
-  badgeRegion:       { color: '#333', fontSize: 11 },
+    badgeRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: T.card, gap: 12 },
+    badgeEmoji:        { fontSize: 20, width: 28, textAlign: 'center' },
+    badgeBody:         { flex: 1, gap: 2 },
+    badgeName:         { color: T.text, fontSize: 14, fontWeight: '700' },
+    badgeVehicle:      { color: T.text2, fontSize: 12 },
+    badgeRegion:       { color: T.text3, fontSize: 11 },
 
-  sectionHeaderRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionAction:     { color: '#e63946', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  plateHint:         { color: '#333', fontSize: 12, lineHeight: 17 },
-  plateForm:         { gap: 8, marginTop: 4 },
-  plateInput:        { backgroundColor: '#141414', color: '#fff', borderRadius: 8, padding: 12, fontSize: 14, borderWidth: 1, borderColor: '#222' },
-  plateAddBtn:       { backgroundColor: '#e63946', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
-  plateAddBtnText:   { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 2 },
-  plateRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111', gap: 12 },
-  plateDot:          { width: 8, height: 8, borderRadius: 4, backgroundColor: '#e63946' },
-  plateLabel:        { color: '#fff', fontSize: 14, fontWeight: '600' },
-  plateDate:         { color: '#333', fontSize: 11, marginTop: 2 },
-  plateRemove:       { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+    sectionHeaderRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    sectionAction:     { color: T.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+    plateHint:         { color: T.text3, fontSize: 12, lineHeight: 17 },
+    plateForm:         { gap: 8, marginTop: 4 },
+    plateInput:        { backgroundColor: T.card, color: T.text, borderRadius: 8, padding: 12, fontSize: 14, borderWidth: 1, borderColor: T.border },
+    plateAddBtn:       { backgroundColor: T.accent, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+    plateAddBtnText:   { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 2 },
+    plateRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: T.card, gap: 12 },
+    plateDot:          { width: 8, height: 8, borderRadius: 4, backgroundColor: T.accent },
+    plateLabel:        { color: T.text, fontSize: 14, fontWeight: '600' },
+    plateDate:         { color: T.text3, fontSize: 11, marginTop: 2 },
+    plateRemove:       { color: T.text3, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
 
-  settingRow:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111' },
-  settingBody:       { flex: 1, gap: 3 },
-  settingLabel:      { color: '#fff', fontSize: 14, fontWeight: '600' },
-  settingDesc:       { color: '#444', fontSize: 12, lineHeight: 16 },
-  settingDisclaimer: { color: '#333', fontSize: 11, fontStyle: 'italic' },
+    themeSection:      { gap: 10, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: T.card },
+    themeRow:          { gap: 8 },
+    themePill:         { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14, gap: 10 },
+    themeAccentDot:    { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+    themePillName:     { fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+    themePillTag:      { fontSize: 10, marginTop: 1 },
 
-  actions:           { gap: 10, marginTop: 8 },
-  actionButton:      { backgroundColor: '#111', borderWidth: 1, borderColor: '#1a1a1a', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
-  signOutButton:     { backgroundColor: 'transparent', borderColor: '#1a1a1a' },
-  actionText:        { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 2 },
-  signOutText:       { color: '#333', fontSize: 13, fontWeight: '700', letterSpacing: 2 },
-});
+    settingRow:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: T.card },
+    settingBody:       { flex: 1, gap: 3 },
+    settingLabel:      { color: T.text, fontSize: 14, fontWeight: '600' },
+    settingDesc:       { color: T.text3, fontSize: 12, lineHeight: 16 },
+    settingDisclaimer: { color: T.text3, fontSize: 11, fontStyle: 'italic' },
+
+    actions:           { gap: 10, marginTop: 8 },
+    actionButton:      { backgroundColor: T.card, borderWidth: 1, borderColor: T.card2, borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+    signOutButton:     { backgroundColor: 'transparent', borderColor: T.card2 },
+    actionText:        { color: T.text, fontSize: 13, fontWeight: '700', letterSpacing: 2 },
+    signOutText:       { color: T.text3, fontSize: 13, fontWeight: '700', letterSpacing: 2 },
+  });
+}

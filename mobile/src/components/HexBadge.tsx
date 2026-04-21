@@ -469,9 +469,7 @@ export function HexBadge({ badge, size = 80, pulseGlow = false }: HexBadgeProps)
         {/* Icon */}
         <G clipPath={`url(#cl${uid})`}>
           <G transform={`translate(${ix},${iy}) scale(${iconScale})`} opacity={badge.earned ? 1 : 0.22}>
-            <Svg width="40" height="40" viewBox="0 0 40 40">
-              <IconComponent/>
-            </Svg>
+            <IconComponent/>
           </G>
         </G>
 

@@ -4,7 +4,7 @@
  * Correct guess → XP (orbital boost applies).
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Image,
   ActivityIndicator, ScrollView, TextInput, KeyboardAvoidingView, Platform,
@@ -17,6 +17,7 @@ import { usePlayerStore } from '@/stores/playerStore';
 import { BadgeAwardModal } from '@/components/BadgeAwardModal';
 import { getBadgeById, type Badge } from '@/utils/badges';
 import { posthog } from '@/lib/posthog';
+import { useTheme, type Theme } from '@/lib/theme';
 
 type IdCard = {
   id: string;
@@ -37,6 +38,8 @@ type GuessResult = {
 };
 
 export default function IdentifyScreen() {
+  const T      = useTheme();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const queryClient = useQueryClient();
   const setProfile  = usePlayerStore(s => s.setProfile);
 
@@ -131,7 +134,7 @@ export default function IdentifyScreen() {
 
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#e63946" />
+          <ActivityIndicator size="large" color={T.accent} />
           <Text style={styles.hint}>Loading cars…</Text>
         </View>
       ) : isError ? (
@@ -260,55 +263,57 @@ export default function IdentifyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container:           { flex: 1, backgroundColor: '#0a0a0a' },
-  header:              { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#141414' },
-  backBtn:             { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText:            { color: '#555', fontSize: 22 },
-  title:               { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 4 },
-  headerRight:         { width: 36, alignItems: 'flex-end' },
-  counter:             { color: '#333', fontSize: 12 },
+function makeStyles(T: Theme) {
+  return StyleSheet.create({
+    container:           { flex: 1, backgroundColor: T.bg },
+    header:              { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: T.card },
+    backBtn:             { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+    backText:            { color: T.text2, fontSize: 22 },
+    title:               { color: T.text, fontSize: 14, fontWeight: '900', letterSpacing: 4 },
+    headerRight:         { width: 36, alignItems: 'flex-end' },
+    counter:             { color: T.text3, fontSize: 12 },
 
-  center:              { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-  hint:                { color: '#444', fontSize: 14, textAlign: 'center' },
-  emptyTitle:          { color: '#fff', fontSize: 20, fontWeight: '900', letterSpacing: 3 },
+    center:              { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
+    hint:                { color: T.text3, fontSize: 14, textAlign: 'center' },
+    emptyTitle:          { color: T.text, fontSize: 20, fontWeight: '900', letterSpacing: 3 },
 
-  scroll:              { padding: 20 },
+    scroll:              { padding: 20 },
 
-  photoWrap:           { borderRadius: 12, overflow: 'hidden', backgroundColor: '#111', marginBottom: 24, position: 'relative' },
-  photo:               { width: '100%', aspectRatio: 4 / 3 },
-  resultOverlay:       { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  resultCorrect:       { backgroundColor: 'rgba(34,197,94,0.7)' },
-  resultWrong:         { backgroundColor: 'rgba(230,57,70,0.7)' },
-  resultEmoji:         { fontSize: 40, color: '#fff' },
-  resultLabel:         { fontSize: 18, fontWeight: '900', letterSpacing: 4, color: '#fff' },
-  resultXp:            { fontSize: 14, fontWeight: '800', color: '#fff', marginTop: 2 },
-  attribution:         { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 12, paddingVertical: 6 },
-  attributionText:     { color: 'rgba(255,255,255,0.45)', fontSize: 10 },
+    photoWrap:           { borderRadius: 12, overflow: 'hidden', backgroundColor: T.card, marginBottom: 24, position: 'relative' },
+    photo:               { width: '100%', aspectRatio: 4 / 3 },
+    resultOverlay:       { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', gap: 4 },
+    resultCorrect:       { backgroundColor: 'rgba(34,197,94,0.7)' },
+    resultWrong:         { backgroundColor: 'rgba(230,57,70,0.7)' },
+    resultEmoji:         { fontSize: 40, color: '#fff' },
+    resultLabel:         { fontSize: 18, fontWeight: '900', letterSpacing: 4, color: '#fff' },
+    resultXp:            { fontSize: 14, fontWeight: '800', color: '#fff', marginTop: 2 },
+    attribution:         { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 12, paddingVertical: 6 },
+    attributionText:     { color: 'rgba(255,255,255,0.45)', fontSize: 10 },
 
-  prompt:              { color: '#333', fontSize: 11, fontWeight: '800', letterSpacing: 3, marginBottom: 14 },
+    prompt:              { color: T.text3, fontSize: 11, fontWeight: '800', letterSpacing: 3, marginBottom: 14 },
 
-  textEntryWrap:       { gap: 12 },
-  input:               { backgroundColor: '#141414', borderWidth: 1, borderColor: '#222', borderRadius: 10, paddingVertical: 16, paddingHorizontal: 20, color: '#fff', fontSize: 16, fontWeight: '600' },
-  inputCorrect:        { borderColor: '#22c55e', color: '#22c55e' },
-  inputWrong:          { borderColor: '#e63946', color: '#e63946' },
-  submitBtn:           { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
-  submitBtnDisabled:   { opacity: 0.2 },
-  submitBtnText:       { color: '#000', fontWeight: '900', fontSize: 14, letterSpacing: 2 },
+    textEntryWrap:       { gap: 12 },
+    input:               { backgroundColor: T.card, borderWidth: 1, borderColor: T.border, borderRadius: 10, paddingVertical: 16, paddingHorizontal: 20, color: T.text, fontSize: 16, fontWeight: '600' },
+    inputCorrect:        { borderColor: '#22c55e', color: '#22c55e' },
+    inputWrong:          { borderColor: T.accent, color: T.accent },
+    submitBtn:           { backgroundColor: T.text, borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
+    submitBtnDisabled:   { opacity: 0.2 },
+    submitBtnText:       { color: T.bg, fontWeight: '900', fontSize: 14, letterSpacing: 2 },
 
-  options:             { gap: 10 },
-  option:              { backgroundColor: '#141414', borderWidth: 1, borderColor: '#222', borderRadius: 10, paddingVertical: 16, paddingHorizontal: 20 },
-  optionCorrect:       { backgroundColor: '#0a2a0a', borderColor: '#22c55e' },
-  optionWrong:         { backgroundColor: '#2a0a0a', borderColor: '#e63946' },
-  optionDim:           { opacity: 0.4 },
-  optionText:          { color: '#fff', fontSize: 15, fontWeight: '700' },
-  optionTextCorrect:   { color: '#22c55e' },
-  optionTextWrong:     { color: '#e63946' },
+    options:             { gap: 10 },
+    option:              { backgroundColor: T.card, borderWidth: 1, borderColor: T.border, borderRadius: 10, paddingVertical: 16, paddingHorizontal: 20 },
+    optionCorrect:       { backgroundColor: '#0a2a0a', borderColor: '#22c55e' },
+    optionWrong:         { backgroundColor: '#2a0a0a', borderColor: T.accent },
+    optionDim:           { opacity: 0.4 },
+    optionText:          { color: T.text, fontSize: 15, fontWeight: '700' },
+    optionTextCorrect:   { color: '#22c55e' },
+    optionTextWrong:     { color: T.accent },
 
-  answerReveal:        { marginTop: 20, backgroundColor: '#111', borderRadius: 10, padding: 16, borderWidth: 1, borderColor: '#22c55e33' },
-  answerRevealLabel:   { color: '#333', fontSize: 10, fontWeight: '800', letterSpacing: 2, marginBottom: 4 },
-  answerRevealValue:   { color: '#22c55e', fontSize: 16, fontWeight: '800' },
+    answerReveal:        { marginTop: 20, backgroundColor: T.card, borderRadius: 10, padding: 16, borderWidth: 1, borderColor: '#22c55e33' },
+    answerRevealLabel:   { color: T.text3, fontSize: 10, fontWeight: '800', letterSpacing: 2, marginBottom: 4 },
+    answerRevealValue:   { color: '#22c55e', fontSize: 16, fontWeight: '800' },
 
-  nextBtn:             { marginTop: 20, backgroundColor: '#e63946', borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
-  nextBtnText:         { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 2 },
-});
+    nextBtn:             { marginTop: 20, backgroundColor: T.accent, borderRadius: 10, paddingVertical: 16, alignItems: 'center' },
+    nextBtnText:         { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 2 },
+  });
+}

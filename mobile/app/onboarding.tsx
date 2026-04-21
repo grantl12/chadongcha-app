@@ -16,6 +16,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { apiClient } from '@/api/client';
 import { supabase } from '@/lib/supabase';
 import { posthog } from '@/lib/posthog';
+import { useTheme, type Theme } from '@/lib/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -47,6 +48,7 @@ const FEATURES = [
 ];
 
 function SplashStep({ onNext }: { onNext: () => void }) {
+  const styles = makeStyles(useTheme());
   return (
     <View style={styles.splashContainer}>
       <View style={styles.splashHero}>
@@ -87,6 +89,7 @@ function AuthStep({ onSuccess, onNeedsUsername }: {
   onSuccess: () => void;
   onNeedsUsername: (token: string, userId: string) => void;
 }) {
+  const styles = makeStyles(useTheme());
   const { setPlayer, setProfile, setFullProfile } = usePlayerStore();
   const [mode, setMode]         = useState<AuthMode>('signup');
   const [email, setEmail]       = useState('');
@@ -338,6 +341,7 @@ function UsernameStep({ token, userId, onSuccess }: {
   userId: string;
   onSuccess: () => void;
 }) {
+  const styles = makeStyles(useTheme());
   const { setPlayer, setFullProfile } = usePlayerStore();
   const [username, setUsername] = useState('');
   const [loading, setLoading]   = useState(false);
@@ -458,6 +462,7 @@ function PermRow({
   icon: string; title: string; body: string;
   status: PermStatus; extraNote?: string; onRequest: () => void;
 }) {
+  const styles = makeStyles(useTheme());
   return (
     <View style={styles.permRow}>
       <Text style={styles.permIcon}>{icon}</Text>
@@ -482,6 +487,8 @@ function PermRow({
 }
 
 function PermissionsStep({ onDone }: { onDone: () => void }) {
+  const T = useTheme();
+  const styles = makeStyles(T);
   const { contributeScans, toggleContributeScans } = useSettingsStore();
   const [perms, setPerms] = useState<PermState>({
     location:      'pending',
@@ -553,7 +560,7 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
               toggleContributeScans();
               posthog.capture(val ? 'data_sharing_opt_in' : 'data_sharing_opt_out', { source: 'onboarding' });
             }}
-            trackColor={{ false: '#222', true: '#4a9eff' }}
+            trackColor={{ false: T.border, true: T.accent3 }}
             thumbColor="#fff"
           />
         </View>
@@ -586,6 +593,7 @@ function PermissionsStep({ onDone }: { onDone: () => void }) {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function Onboarding() {
+  const styles = makeStyles(useTheme());
   const [step, setStep] = useState<Step>('splash');
   const [oauthToken, setOauthToken]   = useState('');
   const [oauthUserId, setOauthUserId] = useState('');
@@ -632,67 +640,69 @@ export default function Onboarding() {
   );
 }
 
-const styles = StyleSheet.create({
-  root:               { flex: 1, backgroundColor: '#0a0a0a' },
+function makeStyles(T: Theme) {
+  return StyleSheet.create({
+    root:               { flex: 1, backgroundColor: T.bg },
 
-  // Splash
-  splashContainer:    { flex: 1, padding: 32, justifyContent: 'space-between', paddingTop: 100, paddingBottom: 50 },
-  splashHero:         { alignItems: 'center', gap: 4 },
-  splashTitle:        { color: '#fff', fontSize: 64, fontWeight: '900', letterSpacing: -2 },
-  splashRomaji:       { color: '#e63946', fontSize: 13, letterSpacing: 5, fontWeight: '700' },
-  splashTagline:      { color: '#444', fontSize: 14, marginTop: 8 },
+    // Splash
+    splashContainer:    { flex: 1, padding: 32, justifyContent: 'space-between', paddingTop: 100, paddingBottom: 50 },
+    splashHero:         { alignItems: 'center', gap: 4 },
+    splashTitle:        { color: T.text, fontSize: 64, fontWeight: '900', letterSpacing: -2 },
+    splashRomaji:       { color: T.accent, fontSize: 13, letterSpacing: 5, fontWeight: '700' },
+    splashTagline:      { color: T.text3, fontSize: 14, marginTop: 8 },
 
-  featureList:        { gap: 20 },
-  featureRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
-  featureIcon:        { fontSize: 24, width: 36, textAlign: 'center', marginTop: 2 },
-  featureBody:        { flex: 1, gap: 2 },
-  featureTitle:       { color: '#fff', fontSize: 15, fontWeight: '700' },
-  featureDesc:        { color: '#555', fontSize: 13 },
+    featureList:        { gap: 20 },
+    featureRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+    featureIcon:        { fontSize: 24, width: 36, textAlign: 'center', marginTop: 2 },
+    featureBody:        { flex: 1, gap: 2 },
+    featureTitle:       { color: T.text, fontSize: 15, fontWeight: '700' },
+    featureDesc:        { color: T.text2, fontSize: 13 },
 
-  // Auth
-  authContainer:      { flexGrow: 1, padding: 32, paddingTop: 100, justifyContent: 'flex-start' },
-  authTitle:          { color: '#fff', fontSize: 32, fontWeight: '900', marginBottom: 6 },
-  authSub:            { color: '#555', fontSize: 14, marginBottom: 40 },
+    // Auth
+    authContainer:      { flexGrow: 1, padding: 32, paddingTop: 100, justifyContent: 'flex-start' },
+    authTitle:          { color: T.text, fontSize: 32, fontWeight: '900', marginBottom: 6 },
+    authSub:            { color: T.text2, fontSize: 14, marginBottom: 40 },
 
-  ssoButtons:         { gap: 12, marginBottom: 8 },
-  appleBtn:           { width: '100%', height: 50 },
-  googleBtn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-                        backgroundColor: '#fff', borderRadius: 8, height: 50 },
-  googleIcon:         { color: '#e63946', fontSize: 18, fontWeight: '900' },
-  googleText:         { color: '#111', fontSize: 15, fontWeight: '700' },
+    ssoButtons:         { gap: 12, marginBottom: 8 },
+    appleBtn:           { width: '100%', height: 50 },
+    googleBtn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+                          backgroundColor: '#fff', borderRadius: 8, height: 50 },
+    googleIcon:         { color: '#e63946', fontSize: 18, fontWeight: '900' },
+    googleText:         { color: '#111', fontSize: 15, fontWeight: '700' },
 
-  emailToggle:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 20 },
-  dividerLine:        { flex: 1, height: 1, backgroundColor: '#1a1a1a' },
-  dividerText:        { color: '#333', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+    emailToggle:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 20 },
+    dividerLine:        { flex: 1, height: 1, backgroundColor: T.card2 },
+    dividerText:        { color: T.text3, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
 
-  form:               { gap: 12 },
-  input:              { backgroundColor: '#141414', color: '#fff', borderRadius: 8, padding: 14, fontSize: 15, borderWidth: 1, borderColor: '#222' },
-  error:              { color: '#e63946', fontSize: 13, textAlign: 'center', marginBottom: 4 },
-  infoText:           { color: '#4ade80', fontSize: 13, textAlign: 'center' },
+    form:               { gap: 12 },
+    input:              { backgroundColor: T.card, color: T.text, borderRadius: 8, padding: 14, fontSize: 15, borderWidth: 1, borderColor: T.border },
+    error:              { color: '#e63946', fontSize: 13, textAlign: 'center', marginBottom: 4 },
+    infoText:           { color: '#4ade80', fontSize: 13, textAlign: 'center' },
 
-  // Permissions
-  permContainer:      { flex: 1, padding: 32, paddingTop: 100 },
-  permHeading:        { color: '#fff', fontSize: 32, fontWeight: '900', marginBottom: 8 },
-  permSub:            { color: '#555', fontSize: 14, marginBottom: 40, lineHeight: 20 },
-  permList:           { gap: 0 },
-  permRow:            { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#111', gap: 16 },
-  permIcon:           { fontSize: 22, width: 32, textAlign: 'center' },
-  permBody:           { flex: 1, gap: 3 },
-  permTitle:          { color: '#fff', fontSize: 15, fontWeight: '700' },
-  permDesc:           { color: '#555', fontSize: 13, lineHeight: 18 },
-  permExtraNote:      { color: '#4ade80', fontSize: 11, marginTop: 4, fontWeight: '600' },
-  permBtn:            { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333', borderRadius: 6, paddingHorizontal: 14, paddingVertical: 8 },
-  permBtnText:        { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  permGranted:        { color: '#4ade80', fontSize: 18, fontWeight: '700', width: 32, textAlign: 'center' },
-  permDenied:         { color: '#333', fontSize: 18, fontWeight: '700', width: 32, textAlign: 'center' },
-  permFooter:         { marginTop: 32, gap: 12 },
-  permWarning:        { color: '#f59e0b', fontSize: 13, lineHeight: 18 },
-  privacyLink:        { color: '#4a9eff', textDecorationLine: 'underline', fontSize: 12, fontWeight: '600' },
+    // Permissions
+    permContainer:      { flex: 1, padding: 32, paddingTop: 100 },
+    permHeading:        { color: T.text, fontSize: 32, fontWeight: '900', marginBottom: 8 },
+    permSub:            { color: T.text2, fontSize: 14, marginBottom: 40, lineHeight: 20 },
+    permList:           { gap: 0 },
+    permRow:            { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: T.card, gap: 16 },
+    permIcon:           { fontSize: 22, width: 32, textAlign: 'center' },
+    permBody:           { flex: 1, gap: 3 },
+    permTitle:          { color: T.text, fontSize: 15, fontWeight: '700' },
+    permDesc:           { color: T.text2, fontSize: 13, lineHeight: 18 },
+    permExtraNote:      { color: '#4ade80', fontSize: 11, marginTop: 4, fontWeight: '600' },
+    permBtn:            { backgroundColor: T.card2, borderWidth: 1, borderColor: T.text3, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 8 },
+    permBtnText:        { color: T.text, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+    permGranted:        { color: '#4ade80', fontSize: 18, fontWeight: '700', width: 32, textAlign: 'center' },
+    permDenied:         { color: T.text3, fontSize: 18, fontWeight: '700', width: 32, textAlign: 'center' },
+    permFooter:         { marginTop: 32, gap: 12 },
+    permWarning:        { color: '#f59e0b', fontSize: 13, lineHeight: 18 },
+    privacyLink:        { color: T.accent3, textDecorationLine: 'underline', fontSize: 12, fontWeight: '600' },
 
-  // Shared
-  primaryButton:      { backgroundColor: '#e63946', borderRadius: 8, paddingVertical: 16, alignItems: 'center' },
-  buttonDisabled:     { opacity: 0.6 },
-  buttonText:         { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 2 },
-  secondaryLink:      { alignItems: 'center', paddingVertical: 8 },
-  secondaryLinkText:  { color: '#555', fontSize: 13 },
-});
+    // Shared
+    primaryButton:      { backgroundColor: T.accent, borderRadius: 8, paddingVertical: 16, alignItems: 'center' },
+    buttonDisabled:     { opacity: 0.6 },
+    buttonText:         { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 2 },
+    secondaryLink:      { alignItems: 'center', paddingVertical: 8 },
+    secondaryLinkText:  { color: T.text2, fontSize: 13 },
+  });
+}

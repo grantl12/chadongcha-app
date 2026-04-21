@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PostHogProvider } from 'posthog-react-native';
 import { usePlayerStore } from '@/stores/playerStore';
 import { posthog } from '@/lib/posthog';
+import { ThemeProvider, useTheme } from '@/lib/theme';
 
 const queryClient = new QueryClient();
 
@@ -35,21 +36,30 @@ function PostHogTracker() {
   return null;
 }
 
+function ThemedStack() {
+  const T = useTheme();
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: T.bg } }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="highway" options={{ presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="scan360" options={{ presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="vehicle/[id]" options={{ presentation: 'card' }} />
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   return (
     <PostHogProvider client={posthog}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <PostHogTracker />
-            <StatusBar style="light" />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0a0a' } }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="onboarding" />
-              <Stack.Screen name="highway" options={{ presentation: 'fullScreenModal' }} />
-              <Stack.Screen name="scan360" options={{ presentation: 'fullScreenModal' }} />
-              <Stack.Screen name="vehicle/[id]" options={{ presentation: 'card' }} />
-            </Stack>
+            <ThemeProvider>
+              <PostHogTracker />
+              <StatusBar style="light" />
+              <ThemedStack />
+            </ThemeProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

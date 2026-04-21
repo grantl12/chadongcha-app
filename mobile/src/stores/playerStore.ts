@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export type ThemeName = 'tactical' | 'carbon' | 'ghost';
+
 export type StoredBoost = {
   id:          string;
   rarityTier:  string;
@@ -37,6 +39,7 @@ type PlayerStore = {
   isSubscriber: boolean;
   storedBoosts: StoredBoost[];
   pendingBoostDecision: PendingBoostDecision | null;
+  theme: ThemeName;
 
   setPlayer: (data: { userId: string; username: string; accessToken: string; provider?: string }) => void;
   setProfile: (xp: number, level: number) => void;
@@ -62,6 +65,7 @@ type PlayerStore = {
   clearPendingBoostDecision: () => void;
   addStoredBoost: (boost: StoredBoost) => void;
   consumeStoredBoost: (id: string) => void;
+  setTheme: (theme: ThemeName) => void;
   clearSession: () => void;
 };
 
@@ -83,6 +87,7 @@ export const usePlayerStore = create<PlayerStore>()(
       isSubscriber: false,
       storedBoosts: [],
       pendingBoostDecision: null,
+      theme: 'tactical' as ThemeName,
 
       setPlayer({ userId, username, accessToken, provider }) {
         set({ userId, username, accessToken, ...(provider ? { provider } : {}) });
@@ -147,6 +152,10 @@ export const usePlayerStore = create<PlayerStore>()(
 
       consumeStoredBoost(id) {
         set(s => ({ storedBoosts: s.storedBoosts.filter(b => b.id !== id) }));
+      },
+
+      setTheme(theme) {
+        set({ theme });
       },
 
       clearSession() {

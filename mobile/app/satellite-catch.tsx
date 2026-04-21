@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useCatchStore } from '@/stores/catchStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { posthog } from '@/lib/posthog';
+import { useTheme } from '@/lib/theme';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ function Stars({ stars }: { stars: StarDef[] }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SatelliteCatchScreen() {
+  const T = useTheme();
   const params = useLocalSearchParams<{
     catchableId: string;
     objectName:  string;
@@ -206,7 +208,7 @@ export default function SatelliteCatchScreen() {
 
       {/* Cancel */}
       <Pressable style={styles.cancelBtn} onPress={() => router.back()} disabled={isCaught}>
-        <Text style={styles.cancelText}>✕</Text>
+        <Text style={[styles.cancelText, { color: T.text3 }]}>✕</Text>
       </Pressable>
 
       {/* Object info */}
@@ -292,7 +294,7 @@ const styles = StyleSheet.create({
   },
 
   cancelBtn:  { position: 'absolute', top: 58, left: 20, zIndex: 10, padding: 12 },
-  cancelText: { color: '#444', fontSize: 18, fontWeight: '700' },
+  cancelText: { color: '#555', fontSize: 18, fontWeight: '700' },
 
   objectInfo: {
     marginTop:  90,

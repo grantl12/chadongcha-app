@@ -48,6 +48,8 @@ async def signup(request: Request, body: SignUpRequest):
             "id":       user_id,
             "username": body.username,
             "credits":  100,          # welcome bonus
+            "xp":       0,
+            "level":    1,
         }, on_conflict="id").execute()
     except Exception as e:
         detail = str(e)
@@ -58,7 +60,10 @@ async def signup(request: Request, body: SignUpRequest):
     # Immediately issue a session so the mobile client can skip the sign-in step.
     try:
         signin = db.auth.sign_in_with_password({"email": body.email, "password": body.password})
-        ph.capture(user_id, "signup_success", properties={"provider": "email"})  # type: ignore[misc]
+        try:
+            ph.capture(user_id, "signup_success", properties={"provider": "email"})  # type: ignore[misc]
+        except Exception:
+            pass
         if signin.session is None:
             return {"user_id": user_id}
         return {
@@ -83,7 +88,10 @@ async def signin(request: Request, body: SignInRequest):
     if not result.session or not result.user:
         raise HTTPException(status_code=401, detail="Sign in failed")
 
-    ph.capture(result.user.id, "signin_success", properties={"provider": "email"})  # type: ignore[misc]
+    try:
+        ph.capture(result.user.id, "signin_success", properties={"provider": "email"})  # type: ignore[misc]
+    except Exception:
+        pass
     return {
         "access_token": result.session.access_token,
         "refresh_token": result.session.refresh_token,
@@ -150,12 +158,18 @@ async def upsert_profile(request: Request, body: UpsertProfileRequest, authoriza
             "id":       user_id,
             "username": body.username,
             "credits":  100,
+            "xp":       0,
+            "level":    1,
         }, on_conflict="id").execute()
-        ph.capture(user_id, "profile_upsert_success", properties={"username": body.username})  # type: ignore[misc]
     except Exception as e:
         if "username" in str(e).lower():
             raise HTTPException(status_code=409, detail="Username already taken")
         raise HTTPException(status_code=500, detail="Could not create player profile")
+
+    try:
+        ph.capture(user_id, "profile_upsert_success", properties={"username": body.username})  # type: ignore[misc]
+    except Exception:
+        pass
 
     result = db.table("players") \
         .select("username, xp, level, credits, crew_id, is_subscriber") \

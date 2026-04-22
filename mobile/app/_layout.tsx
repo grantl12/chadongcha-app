@@ -4,9 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { PostHogProvider, usePostHog } from 'posthog-react-native';
+import PostHog from 'posthog-react-native';
 import { usePlayerStore } from '@/stores/playerStore';
-import { connectPostHog } from '@/lib/posthog';
+import { connectPostHog, posthog } from '@/lib/posthog';
 import { ThemeProvider, useTheme } from '@/lib/theme';
 
 const queryClient = new QueryClient();
@@ -15,34 +15,36 @@ const POSTHOG_API_KEY = 'phc_AF7zruUuPR2rA5g6t4p58uWNqEth9qhVCL8jik2h84Sa';
 const POSTHOG_HOST    = 'https://us.i.posthog.com';
 
 function PostHogTracker() {
-  const client   = usePostHog();
   const userId   = usePlayerStore(s => s.userId);
   const username = usePlayerStore(s => s.username);
   const provider = usePlayerStore(s => s.provider);
   const pathname = usePathname();
   const params   = useLocalSearchParams();
 
-  // Wire the provider-managed client into our lazy proxy so that
-  // posthog.capture() calls throughout the app work without a module-level singleton.
+  // Instantiate PostHog after mount, not at module load time.
+  // PostHogProvider (the React context wrapper) crashes in production because
+  // posthog-react-native 3.3.7 references React without importing it — a
+  // bundler scope issue. Bypassing the provider and using the class directly
+  // in useEffect avoids both the module-load native crash and the React scope crash.
   useEffect(() => {
-    if (client) connectPostHog(client);
-  }, [client]);
+    const client = new PostHog(POSTHOG_API_KEY, { host: POSTHOG_HOST });
+    connectPostHog(client);
+  }, []);
 
   useEffect(() => {
-    if (!client) return;
     if (userId) {
-      client.identify(userId, {
+      posthog.identify(userId, {
         ...(username ? { username } : {}),
         ...(provider ? { provider } : {}),
       });
     } else {
-      client.reset();
+      posthog.reset();
     }
-  }, [client, userId, username, provider]);
+  }, [userId, username, provider]);
 
   useEffect(() => {
-    if (client) client.screen(pathname, params as Record<string, string>);
-  }, [client, pathname, params]);
+    posthog.screen(pathname, params);
+  }, [pathname, params]);
 
   return null;
 }
@@ -62,18 +64,16 @@ function ThemedStack() {
 
 export default function RootLayout() {
   return (
-    <PostHogProvider apiKey={POSTHOG_API_KEY} options={{ host: POSTHOG_HOST }}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <QueryClientProvider client={queryClient}>
-            <ThemeProvider>
-              <PostHogTracker />
-              <StatusBar style="light" />
-              <ThemedStack />
-            </ThemeProvider>
-          </QueryClientProvider>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    </PostHogProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <PostHogTracker />
+            <StatusBar style="light" />
+            <ThemedStack />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
